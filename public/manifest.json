@@ -1,0 +1,21 @@
+{
+  "name": "Mairie Connect Bénin",
+  "short_name": "MairieConnect",
+  "description": "Portail National de l'e-Gouvernance des Communes du Bénin",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#004d2c",
+  "theme_color": "#004d2c",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Coat_of_arms_of_Benin.svg/192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Coat_of_arms_of_Benin.svg/512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

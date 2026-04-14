@@ -1,0 +1,5 @@
+{
+  "name": "Bénin Commune Connect",
+  "description": "Solution GovTech nationale pour la digitalisation des communes du Bénin. Guichet numérique unique offrant services administratifs, suivi de dossiers, participation citoyenne et assistant intelligent pour les 77 communes.",
+  "requestFramePermissions": ["geolocation"]
+}
