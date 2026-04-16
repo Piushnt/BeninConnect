@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Pagination } from '../components/Pagination';
 
 export const AdminPortal: React.FC = () => {
   const { tenant } = useTenant();
@@ -70,7 +71,7 @@ export const AdminPortal: React.FC = () => {
   });
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
 
   const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
@@ -138,6 +139,7 @@ export const AdminPortal: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
+    setTotalItems(0);
   }, [activeTab]);
 
   useEffect(() => {
@@ -154,52 +156,7 @@ export const AdminPortal: React.FC = () => {
       if (activeTab === 'partners') fetchPartners();
       if (activeTab === 'locations') fetchLocations();
     }
-  }, [tenant, activeTab, currentPage]);
-
-  const Pagination = ({ total, current, onChange }: { total: number, current: number, onChange: (p: number) => void }) => {
-    const totalPages = Math.ceil(total / itemsPerPage);
-    if (totalPages <= 1) return null;
-
-    return (
-      <div className="flex flex-col sm:flex-row justify-between items-center mt-8 p-6 bg-gray-50/50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5 gap-4">
-        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-          Affichage de {Math.min(itemsPerPage, total - (current - 1) * itemsPerPage)} sur {total} éléments
-        </span>
-        <div className="flex items-center gap-2">
-          <button 
-            disabled={current === 1}
-            onClick={() => onChange(current - 1)}
-            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all disabled:opacity-50"
-          >
-            Précédent
-          </button>
-          <div className="flex items-center gap-1">
-            {[...Array(totalPages)].map((_, i) => (
-              <button
-                key={i}
-                onClick={() => onChange(i + 1)}
-                className={cn(
-                  "w-8 h-8 rounded-lg text-[10px] font-bold transition-all",
-                  current === i + 1 
-                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" 
-                    : "bg-white dark:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white border border-gray-100 dark:border-white/10"
-                )}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-          <button 
-            disabled={current === totalPages}
-            onClick={() => onChange(current + 1)}
-            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all disabled:opacity-50"
-          >
-            Suivant
-          </button>
-        </div>
-      </div>
-    );
-  };
+  }, [tenant, activeTab, currentPage, pageSize]);
 
   const fetchLocations = async () => {
     if (!tenant) return;
@@ -210,7 +167,7 @@ export const AdminPortal: React.FC = () => {
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenant.id)
         .order('name')
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       if (error) throw error;
       setLocations(data || []);
       setTotalItems(count || 0);
@@ -241,7 +198,7 @@ export const AdminPortal: React.FC = () => {
         .select('*, poll_options(*)', { count: 'exact' })
         .eq('tenant_id', tenant.id)
         .order('created_at', { ascending: false })
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       if (error) throw error;
       setPolls(data || []);
       setTotalItems(count || 0);
@@ -261,7 +218,7 @@ export const AdminPortal: React.FC = () => {
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenant.id)
         .order('order', { ascending: true })
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       if (error) throw error;
       setPartners(data || []);
       setTotalItems(count || 0);
@@ -281,7 +238,7 @@ export const AdminPortal: React.FC = () => {
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenant.id)
         .order('published_at', { ascending: false })
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       
       if (error) throw error;
       setNewsList(data || []);
@@ -341,7 +298,7 @@ export const AdminPortal: React.FC = () => {
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenant.id)
         .order('full_name')
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       if (error) throw error;
       setAllUsers(data || []);
       setTotalItems(count || 0);
@@ -361,7 +318,7 @@ export const AdminPortal: React.FC = () => {
         .select('*, citizen:user_profiles!citizen_id(*), tenant_service:tenant_services!service_id(*, service:public_services(*))', { count: 'exact' })
         .eq('tenant_id', tenant.id)
         .order('created_at', { ascending: false })
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       if (error) throw error;
       setDossiers(data || []);
       setTotalItems(count || 0);
@@ -414,7 +371,7 @@ export const AdminPortal: React.FC = () => {
         .select('*, citizen:user_profiles!citizen_id(*), agent:user_profiles!assigned_to(*)', { count: 'exact' })
         .eq('tenant_id', tenant?.id)
         .order('created_at', { ascending: false })
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
       if (error) throw error;
       setSignalements(data || []);
@@ -749,7 +706,13 @@ export const AdminPortal: React.FC = () => {
                 ))
               )}
             </div>
-            <Pagination total={totalItems} current={currentPage} onChange={setCurrentPage} />
+            <Pagination 
+              total={totalItems} 
+              current={currentPage} 
+              pageSize={pageSize}
+              onChange={setCurrentPage} 
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
 
@@ -918,7 +881,13 @@ export const AdminPortal: React.FC = () => {
                 ))
               )}
             </div>
-            <Pagination total={totalItems} current={currentPage} onChange={setCurrentPage} />
+            <Pagination 
+              total={totalItems} 
+              current={currentPage} 
+              pageSize={pageSize}
+              onChange={setCurrentPage} 
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
 
@@ -931,11 +900,12 @@ export const AdminPortal: React.FC = () => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
                 const notificationData = {
+                  tenant_id: profile.role === 'super_admin' ? null : tenant?.id,
                   title: formData.get('title'),
                   body: formData.get('message'),
                   image_url: formData.get('image_url'),
                   action_url: formData.get('link'),
-                  priority: formData.get('type') === 'alert' ? 'high' : 'normal',
+                  priority: formData.get('type') || 'normal',
                 };
                 
                 const { data: notif, error: notifError } = await supabase
@@ -1144,7 +1114,13 @@ export const AdminPortal: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <Pagination total={totalItems} current={currentPage} onChange={setCurrentPage} />
+              <Pagination 
+                total={totalItems} 
+                current={currentPage} 
+                pageSize={pageSize}
+                onChange={setCurrentPage} 
+                onPageSizeChange={setPageSize}
+              />
             </div>
           </div>
         )}
@@ -1231,7 +1207,13 @@ export const AdminPortal: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <Pagination total={totalItems} current={currentPage} onChange={setCurrentPage} />
+              <Pagination 
+                total={totalItems} 
+                current={currentPage} 
+                pageSize={pageSize}
+                onChange={setCurrentPage} 
+                onPageSizeChange={setPageSize}
+              />
             </div>
           </div>
         )}
@@ -1621,7 +1603,13 @@ export const AdminPortal: React.FC = () => {
                 ))
               )}
             </div>
-            <Pagination total={totalItems} current={currentPage} onChange={setCurrentPage} />
+            <Pagination 
+              total={totalItems} 
+              current={currentPage} 
+              pageSize={pageSize}
+              onChange={setCurrentPage} 
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
 
@@ -1697,7 +1685,13 @@ export const AdminPortal: React.FC = () => {
                 </div>
               ))}
             </div>
-            <Pagination total={totalItems} current={currentPage} onChange={setCurrentPage} />
+            <Pagination 
+              total={totalItems} 
+              current={currentPage} 
+              pageSize={pageSize}
+              onChange={setCurrentPage} 
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
 
@@ -1802,7 +1796,13 @@ export const AdminPortal: React.FC = () => {
                 </div>
               ))}
             </div>
-            <Pagination total={totalItems} current={currentPage} onChange={setCurrentPage} />
+            <Pagination 
+              total={totalItems} 
+              current={currentPage} 
+              pageSize={pageSize}
+              onChange={setCurrentPage} 
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
 

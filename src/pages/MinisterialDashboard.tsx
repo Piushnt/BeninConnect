@@ -22,6 +22,7 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
+import { Pagination } from '../components/Pagination';
 import { 
   BarChart, 
   Bar, 
@@ -52,9 +53,13 @@ export const MinisterialDashboard: React.FC = () => {
   const [dossierStats, setDossierStats] = useState<any[]>([]);
   const [revenueStats, setRevenueStats] = useState<any[]>([]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+
   useEffect(() => {
     fetchNationalData();
-  }, []);
+  }, [currentPage, pageSize]);
 
   const fetchNationalData = async () => {
     try {
@@ -89,11 +94,14 @@ export const MinisterialDashboard: React.FC = () => {
       });
 
       // Fetch tenants with their stats
-      const { data: tenantsData } = await supabase
+      const { data: tenantsData, count: tenantsCount } = await supabase
         .from('tenants')
-        .select('*, department:departments(name)')
-        .limit(10);
+        .select('*, department:departments(name)', { count: 'exact' })
+        .order('name')
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      
       setTenants(tenantsData || []);
+      setTotalItems(tenantsCount || 0);
 
       // Fetch recent dossiers
       const { data: dossiersData } = await supabase
@@ -381,6 +389,13 @@ export const MinisterialDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            <Pagination 
+              total={totalItems} 
+              current={currentPage} 
+              pageSize={pageSize}
+              onChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
 
           {/* Recent Activity */}

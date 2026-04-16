@@ -335,8 +335,8 @@ export const NationalHome: React.FC = () => {
               onChange={(e) => setSelectedDeptFilter(e.target.value)}
             >
               <option value="">Tous les départements</option>
-              {['Alibori', 'Atacora', 'Atlantique', 'Borgou', 'Collines', 'Couffo', 'Donga', 'Littoral', 'Mono', 'Ouémé', 'Plateau', 'Zou'].map(d => (
-                <option key={d} value={d}>{d}</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.name}>{d.name}</option>
               ))}
             </select>
           </div>

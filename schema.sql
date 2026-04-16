@@ -2,6 +2,9 @@
 -- PLATEFORME "BÉNIN CONNECT" - ARCHITECTURE SAAS MULTI-TENANT
 -- RESTRUCTURATION TOTALE (PRODUCTION-READY)
 -- ===============================================================
+-- NOTE: Après avoir exécuté ce script, allez sur la page /system-setup
+-- pour élever votre compte au rang de Super Admin.
+-- ===============================================================
 
 -- 0. NETTOYAGE & EXTENSIONS
 -- ===============================================================
@@ -251,11 +254,12 @@ CREATE TABLE citizen_documents (
 -- Notifications (Campagnes)
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE, -- Ajouté pour simplicité
     title TEXT NOT NULL,
     body TEXT NOT NULL,
     image_url TEXT,
     action_url TEXT,
-    priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+    priority TEXT DEFAULT 'normal' CHECK (priority IN ('info', 'alert', 'news', 'event', 'low', 'normal', 'high', 'urgent')),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -821,8 +825,54 @@ $$ language 'plpgsql';
 
 CREATE TRIGGER dossier_status_log AFTER UPDATE ON dossiers FOR EACH ROW EXECUTE PROCEDURE log_dossier_status_change();
 
+-- 10. FONCTIONS DE BOOTSTRAP & UTILITAIRES
 -- ===============================================================
--- 10. INITIALISATION (SEED)
+
+-- Fonction pour initialiser une nouvelle commune (Services, Features, CMS par défaut)
+CREATE OR REPLACE FUNCTION initialize_tenant(t_id UUID)
+RETURNS void AS $$
+BEGIN
+    -- 1. Activer toutes les features par défaut
+    INSERT INTO tenant_features (tenant_id, feature_id)
+    SELECT t_id, id FROM features
+    ON CONFLICT DO NOTHING;
+
+    -- 2. Activer tous les services publics par défaut
+    INSERT INTO tenant_services (tenant_id, service_id, is_active, is_visible)
+    SELECT t_id, id, true, true FROM public_services
+    ON CONFLICT DO NOTHING;
+
+    -- 3. Créer les sections de base du CMS (Copiées du template national ou valeurs par défaut)
+    INSERT INTO page_sections (tenant_id, page_id, section_id, content)
+    VALUES 
+    (t_id, 'home', 'hero', '{"title": "Bienvenue", "subtitle": "Votre mairie à portée de clic", "badge": "Service Public Digital"}'),
+    (t_id, 'home', 'stats', '[{"label": "Services", "value": "24/7"}, {"label": "Projets", "value": "0"}]'),
+    (t_id, 'home', 'budget', '{"title": "Budget Participatif", "description": "Participez au développement de votre commune.", "amount": "En attente", "button_text": "En savoir plus"}'),
+    (t_id, 'maire', 'biography', '{"name": "Maire de la Commune", "bio": "Biographie en attente de mise à jour.", "photo_url": "https://picsum.photos/seed/maire/400/400"}'),
+    (t_id, 'tourisme', 'hero', '{"title": "Découvrez notre patrimoine", "subtitle": "Une commune riche en culture et en histoire.", "image_url": "https://picsum.photos/seed/tourisme/1920/1080"}'),
+    (t_id, 'actualites', 'hero', '{"title": "Actualités Municipales", "subtitle": "Restez informé des dernières nouvelles de votre commune."}')
+    ON CONFLICT (tenant_id, page_id, section_id) DO UPDATE 
+    SET content = EXCLUDED.content;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Fonction pour s'auto-promouvoir super_admin (Sécurisée par email)
+CREATE OR REPLACE FUNCTION bootstrap_super_admin()
+RETURNS void AS $$
+BEGIN
+    -- Seul l'email du créateur peut s'auto-promouvoir via cette fonction
+    IF (SELECT email FROM auth.users WHERE id = auth.uid()) = 'ulrichhononta@gmail.com' THEN
+        UPDATE user_profiles 
+        SET role = 'super_admin' 
+        WHERE id = auth.uid();
+    ELSE
+        RAISE EXCEPTION 'Non autorisé : Seul le propriétaire de la plateforme peut utiliser cette fonction.';
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ===============================================================
+-- 11. INITIALISATION (SEED)
 -- ===============================================================
 
 -- 12 Départements du Bénin

@@ -74,14 +74,14 @@ export const SystemSetup: React.FC = () => {
           {
             tenant_id: tenant.id,
             title: 'Bienvenue sur Mairie Connect',
-            message: 'Votre plateforme d\'e-gouvernance est désormais active. Découvrez nos nouveaux services en ligne.',
-            type: 'info'
+            body: 'Votre plateforme d\'e-gouvernance est désormais active. Découvrez nos nouveaux services en ligne.',
+            priority: 'info'
           },
           {
             tenant_id: tenant.id,
             title: 'Alerte Travaux',
-            message: 'Des travaux de voirie sont prévus sur l\'axe principal la semaine prochaine. Prévoyez vos déplacements.',
-            type: 'alert'
+            body: 'Des travaux de voirie sont prévus sur l\'axe principal la semaine prochaine. Prévoyez vos déplacements.',
+            priority: 'alert'
           }
         ]);
 
@@ -239,10 +239,8 @@ export const SystemSetup: React.FC = () => {
               if (!profile) return;
               setLoading(true);
               try {
-                const { error } = await supabase
-                  .from('user_profiles')
-                  .update({ role: 'super_admin' })
-                  .eq('id', profile.id);
+                // Use RPC for elevation to bypass RLS restrictions on self-update of role
+                const { error } = await supabase.rpc('bootstrap_super_admin');
                 if (error) throw error;
                 alert('Vous êtes maintenant Super Administrateur ! Rechargez la page.');
                 window.location.reload();

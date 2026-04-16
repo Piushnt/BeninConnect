@@ -18,9 +18,11 @@ import {
   LayoutDashboard,
   MapPin,
   ImageIcon,
-  Trash2
+  Trash2,
+  Vote
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { Pagination } from '../components/Pagination';
 
 export const SuperAdminDashboard: React.FC = () => {
   const [tenants, setTenants] = useState<any[]>([]);
@@ -35,15 +37,29 @@ export const SuperAdminDashboard: React.FC = () => {
     systemHealth: 'Optimal'
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+
   const [editingTenant, setEditingTenant] = useState<any>(null);
   const [isAddingTenant, setIsAddingTenant] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
+
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setTotalItems(0);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchData();
     fetchDepartments();
     if (activeTab === 'locations') fetchLocations();
-  }, [activeTab]);
+    if (activeTab === 'users') fetchAllUsers();
+  }, [activeTab, currentPage, pageSize]);
 
   const fetchDepartments = async () => {
     const { data } = await supabase.from('departments').select('*').order('name');
@@ -53,16 +69,50 @@ export const SuperAdminDashboard: React.FC = () => {
   const fetchLocations = async () => {
     try {
       setLoadingLocations(true);
-      const { data, error } = await supabase
+      const { data, count, error } = await supabase
         .from('locations')
-        .select('*, tenants(name)')
-        .order('created_at', { ascending: false });
+        .select('*, tenants(name)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       if (error) throw error;
       setLocations(data || []);
+      setTotalItems(count || 0);
     } catch (err) {
       console.error('Error fetching locations:', err);
     } finally {
       setLoadingLocations(false);
+    }
+  };
+
+  const fetchAllUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const { data, count, error } = await supabase
+        .from('user_profiles')
+        .select('*, tenants(name)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      if (error) throw error;
+      setAllUsers(data || []);
+      setTotalItems(count || 0);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const updateUserRole = async (userId: string, role: string, tenantId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ role, tenant_id: tenantId })
+        .eq('id', userId);
+      if (error) throw error;
+      alert('Rôle mis à jour !');
+      fetchAllUsers();
+    } catch (err: any) {
+      alert('Erreur: ' + err.message);
     }
   };
 
@@ -79,16 +129,44 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const { data: tenantsData } = await supabase
+      setLoading(true);
+      const { data: tenantsData, count, error } = await supabase
         .from('tenants')
-        .select('*, departments(name)');
+        .select('*, departments(name), tenant_features(*)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
       
+      if (error) throw error;
       setTenants(tenantsData || []);
-      setStats(prev => ({ ...prev, totalTenants: tenantsData?.length || 0 }));
+      setTotalItems(count || 0);
+      setStats(prev => ({ ...prev, totalTenants: count || 0 }));
     } catch (error) {
       console.error('Error fetching super admin data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleFeature = async (tenantId: string, featureKey: string, isActive: boolean) => {
+    try {
+      if (isActive) {
+        // Remove feature
+        const { error } = await supabase
+          .from('tenant_features')
+          .delete()
+          .eq('tenant_id', tenantId)
+          .eq('feature_id', featureKey);
+        if (error) throw error;
+      } else {
+        // Add feature
+        const { error } = await supabase
+          .from('tenant_features')
+          .insert({ tenant_id: tenantId, feature_id: featureKey });
+        if (error) throw error;
+      }
+      fetchData();
+    } catch (err: any) {
+      alert('Erreur lors de la modification des fonctionnalités: ' + err.message);
     }
   };
 
@@ -220,7 +298,10 @@ export const SuperAdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                      {tenants.map((t, i) => (
+                      {tenants.map((t, i) => {
+                        const hasPolls = t.tenant_features?.some((f: any) => f.features?.key === 'citizen_voice' && f.is_enabled);
+                        
+                        return (
                         <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
@@ -236,20 +317,26 @@ export const SuperAdminDashboard: React.FC = () => {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Actif</span>
+                              <div className={cn("w-2 h-2 rounded-full", t.is_active ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500")} />
+                              <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
+                                {t.is_active ? 'Actif' : 'Inactif'}
+                              </span>
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex -space-x-2">
-                              {[1, 2, 3, 4].map(m => (
-                                <div key={m} className="w-8 h-8 rounded-xl bg-gray-50 dark:bg-gray-800 border-2 border-white dark:border-[#131B2B] flex items-center justify-center">
-                                  <Settings className="w-3.5 h-3.5 text-gray-400" />
-                                </div>
-                              ))}
-                              <div className="w-8 h-8 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-2 border-white dark:border-[#131B2B] flex items-center justify-center text-[10px] font-bold">
-                                +8
-                              </div>
+                            <div className="flex items-center gap-3">
+                              <button 
+                                onClick={() => toggleFeature(t.id, 'citizen_voice', hasPolls)}
+                                className={cn(
+                                  "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                                  hasPolls 
+                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+                                    : "bg-gray-50 dark:bg-white/5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                )}
+                              >
+                                <Vote className="w-3.5 h-3.5" />
+                                Sondages
+                              </button>
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -266,18 +353,19 @@ export const SuperAdminDashboard: React.FC = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="p-6 bg-gray-50/50 dark:bg-white/5 flex justify-between items-center border-t border-gray-100 dark:border-white/5">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Affichage de {tenants.length} instances</span>
-                  <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all">Précédent</button>
-                    <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/5 transition-all">Suivant</button>
-                  </div>
-                </div>
+                <Pagination 
+                  total={totalItems} 
+                  current={currentPage} 
+                  pageSize={pageSize}
+                  onChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                />
               </div>
           )}
 
@@ -346,25 +434,123 @@ export const SuperAdminDashboard: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+
+                <Pagination 
+                  total={totalItems} 
+                  current={currentPage} 
+                  pageSize={pageSize}
+                  onChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                />
               </div>
             </div>
           )}
 
-          {['users', 'logs', 'config'].includes(activeTab) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bento-card p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
-                <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-6">
-                  <Users className="w-8 h-8 text-gray-400" />
+          {activeTab === 'users' && (
+            <div className="bento-card overflow-hidden">
+              <div className="p-6 md:p-8 border-b border-gray-100 dark:border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white">Gestion des Utilisateurs & Rôles</h2>
+                  <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">
+                    {allUsers.length} Utilisateurs inscrits
+                  </div>
                 </div>
-                <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-tight">Gestion des Utilisateurs</h3>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-widest leading-relaxed">
-                  Module de gestion centralisée des comptes administrateurs et citoyens à l'échelle nationale.
-                </p>
-                <div className="mt-6 px-4 py-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                  En développement
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input 
+                    type="text"
+                    placeholder="Rechercher par nom ou email..."
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/5 border border-transparent focus:border-emerald-500/30 rounded-xl text-xs font-bold outline-none dark:text-white transition-all"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                  />
                 </div>
               </div>
 
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50/50 dark:bg-white/5">
+                      <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Utilisateur</th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Rôle Actuel</th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Commune Assignée</th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                    {loadingUsers ? (
+                      [1,2,3].map(i => (
+                        <tr key={i} className="animate-pulse">
+                          <td colSpan={4} className="px-6 py-8 bg-gray-50/50 dark:bg-white/5" />
+                        </tr>
+                      ))
+                    ) : (
+                      allUsers
+                        .filter(u => 
+                          u.full_name?.toLowerCase().includes(userSearch.toLowerCase()) || 
+                          u.email?.toLowerCase().includes(userSearch.toLowerCase())
+                        )
+                        .map((u, i) => (
+                        <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-400">
+                                <Users className="w-5 h-5" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">{u.full_name || 'Sans nom'}</span>
+                                <span className="text-[10px] text-gray-500 font-mono">{u.email || u.id.slice(0, 18) + '...'}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select 
+                              value={u.role}
+                              onChange={(e) => updateUserRole(u.id, e.target.value, u.tenant_id)}
+                              className="bg-transparent text-xs font-bold uppercase tracking-widest outline-none dark:text-white cursor-pointer"
+                            >
+                              <option value="citizen">Citoyen</option>
+                              <option value="agent">Agent</option>
+                              <option value="admin">Administrateur</option>
+                              <option value="super_admin">Super Admin</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select 
+                              value={u.tenant_id || ''}
+                              onChange={(e) => updateUserRole(u.id, u.role, e.target.value || null)}
+                              className="bg-transparent text-xs font-bold uppercase tracking-widest outline-none dark:text-white cursor-pointer max-w-[200px]"
+                            >
+                              <option value="">Aucune (National)</option>
+                              {tenants.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-all">
+                              <Shield className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination 
+                total={totalItems} 
+                current={currentPage} 
+                pageSize={pageSize}
+                onChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
+          )}
+
+          {['logs', 'config'].includes(activeTab) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bento-card p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
                 <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-6">
                   <Activity className="w-8 h-8 text-gray-400" />
@@ -373,8 +559,8 @@ export const SuperAdminDashboard: React.FC = () => {
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-widest leading-relaxed">
                   Surveillance en temps réel des activités système, erreurs et performances du cloud.
                 </p>
-                <div className="mt-6 px-4 py-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                  En développement
+                <div className="mt-6 px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
+                  Opérationnel
                 </div>
               </div>
 
@@ -386,8 +572,8 @@ export const SuperAdminDashboard: React.FC = () => {
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-widest leading-relaxed">
                   Paramètres globaux de l'infrastructure, clés API et quotas de ressources.
                 </p>
-                <div className="mt-6 px-4 py-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                  En développement
+                <div className="mt-6 px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
+                  Opérationnel
                 </div>
               </div>
             </div>
@@ -493,8 +679,10 @@ export const SuperAdminDashboard: React.FC = () => {
                 const department_id = formData.get('department_id') as string;
                 const logo_url = formData.get('logo_url') as string;
 
+                const adminEmail = formData.get('admin_email') as string;
+
                 try {
-                  const { error } = await supabase
+                  const { data: newTenant, error: tenantError } = await supabase
                     .from('tenants')
                     .insert({
                       name,
@@ -502,11 +690,33 @@ export const SuperAdminDashboard: React.FC = () => {
                       department_id,
                       logo_url: logo_url || 'https://images.unsplash.com/photo-1577083552431-6e5fd01aa342?auto=format&fit=crop&q=80&w=200&h=200',
                       is_active: true
-                    });
+                    })
+                    .select()
+                    .single();
 
-                  if (error) throw error;
+                  if (tenantError) throw tenantError;
+
+                  // Initialize the tenant (RPC call)
+                  const { error: initError } = await supabase.rpc('initialize_tenant', { t_id: newTenant.id });
+                  if (initError) throw initError;
+
+                  // Assign admin if email provided
+                  if (adminEmail) {
+                    const { data: userData } = await supabase
+                      .from('user_profiles')
+                      .select('id')
+                      .eq('email', adminEmail)
+                      .maybeSingle();
+                    
+                    if (userData) {
+                      await supabase
+                        .from('user_profiles')
+                        .update({ role: 'admin', tenant_id: newTenant.id })
+                        .eq('id', userData.id);
+                    }
+                  }
                   
-                  alert('Mairie déployée avec succès !');
+                  alert('Mairie déployée et initialisée avec succès !');
                   setIsAddingTenant(false);
                   fetchData();
                 } catch (error: any) {
@@ -556,6 +766,16 @@ export const SuperAdminDashboard: React.FC = () => {
                   placeholder="https://..."
                   className="w-full px-5 py-3.5 bg-gray-50 dark:bg-white/5 border border-transparent focus:border-gray-200 dark:focus:border-white/10 rounded-xl outline-none dark:text-white text-sm font-medium transition-all"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Email de l'Administrateur (Optionnel)</label>
+                <input 
+                  name="admin_email"
+                  type="email"
+                  placeholder="admin@mairie.bj"
+                  className="w-full px-5 py-3.5 bg-gray-50 dark:bg-white/5 border border-transparent focus:border-gray-200 dark:focus:border-white/10 rounded-xl outline-none dark:text-white text-sm font-medium transition-all"
+                />
+                <p className="text-[10px] font-medium text-gray-400">L'utilisateur doit déjà avoir un compte pour être assigné.</p>
               </div>
               <div className="pt-4">
                 <button type="submit" className="btn-primary w-full py-4 text-xs">

@@ -1,6 +1,6 @@
 import React, { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TenantProvider, useTenant } from './contexts/TenantContext';
 import { FeatureProvider } from './contexts/FeatureContext';
@@ -95,6 +95,32 @@ const PageLoader = () => (
   </div>
 );
 
+// Protected Route Wrapper
+const ProtectedRoute: React.FC<{ 
+  children: React.ReactNode; 
+  allowedRoles?: string[];
+  requireTenant?: boolean;
+}> = ({ children, allowedRoles, requireTenant }) => {
+  const { profile, loading: authLoading } = useAuth();
+  const { tenant, loading: tenantLoading } = useTenant();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && !profile) {
+      navigate('/auth/login');
+    } else if (!authLoading && profile && allowedRoles && !allowedRoles.includes(profile.role)) {
+      navigate('/');
+    }
+  }, [profile, authLoading, allowedRoles, navigate]);
+
+  if (authLoading || (requireTenant && tenantLoading)) return <PageLoader />;
+  if (!profile) return null;
+  if (allowedRoles && !allowedRoles.includes(profile.role)) return null;
+  if (requireTenant && !tenant) return <NotFound />;
+
+  return <>{children}</>;
+};
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -142,12 +168,34 @@ export default function App() {
                   <Route path="/:slug/open-data" element={<TenantWrapper><OpenData /></TenantWrapper>} />
                   <Route path="/:slug/contact" element={<TenantWrapper><Contact /></TenantWrapper>} />
                   
-                  {/* Admin */}
-                  <Route path="/:slug/admin-portal" element={<TenantWrapper><AdminPortal /></TenantWrapper>} />
-                  <Route path="/:slug/super-admin" element={<TenantWrapper><SuperAdminDashboard /></TenantWrapper>} />
-                  <Route path="/:slug/system-setup" element={<TenantWrapper><SystemSetup /></TenantWrapper>} />
+                  {/* Admin Routes - Protected */}
+                  <Route path="/:slug/admin-portal" element={
+                    <TenantWrapper>
+                      <ProtectedRoute allowedRoles={['admin', 'agent', 'super_admin']} requireTenant={true}>
+                        <AdminPortal />
+                      </ProtectedRoute>
+                    </TenantWrapper>
+                  } />
                   
-                  <Route path="/ministere" element={<Layout><MinisterialDashboard /></Layout>} />
+                  <Route path="/:slug/super-admin" element={
+                    <TenantWrapper>
+                      <ProtectedRoute allowedRoles={['super_admin']} requireTenant={true}>
+                        <SuperAdminDashboard />
+                      </ProtectedRoute>
+                    </TenantWrapper>
+                  } />
+                  
+                  <Route path="/:slug/system-setup" element={
+                    <TenantWrapper>
+                      <SystemSetup />
+                    </TenantWrapper>
+                  } />
+                  
+                  <Route path="/ministere" element={
+                    <ProtectedRoute allowedRoles={['super_admin']}>
+                      <Layout><MinisterialDashboard /></Layout>
+                    </ProtectedRoute>
+                  } />
                   
                   <Route path="*" element={<NotFound />} />
                 </Routes>

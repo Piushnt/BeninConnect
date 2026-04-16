@@ -35,9 +35,9 @@ export const Register: React.FC = () => {
       if (authError) throw authError;
 
       if (authData.user) {
-        // 2. Create profile with role based on PIN
-        const role = adminPin === '1234' ? 'admin' : 'citizen';
-        // Citizens are approved by default to avoid manual intervention as requested
+        // Everyone starts as a citizen as requested. 
+        // Elevation is handled by Super Admin in the dashboard.
+        const role = 'citizen';
         const isApproved = true; 
 
         const { error: profileError } = await supabase
@@ -214,24 +214,6 @@ export const Register: React.FC = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                Code PIN Admin (Optionnel)
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Shield className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="password"
-                  className="block w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-white/5 border border-transparent focus:border-emerald-500/30 rounded-xl text-sm font-medium focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all dark:text-white"
-                  placeholder="PIN réservé aux agents"
-                  value={adminPin}
-                  onChange={(e) => setAdminPin(e.target.value)}
                 />
               </div>
             </div>
