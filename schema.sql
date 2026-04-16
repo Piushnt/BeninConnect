@@ -101,9 +101,11 @@ CREATE TABLE tenant_features (
 CREATE TABLE user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id), -- NULLABLE pour citoyens nationaux (Fix 500)
-    role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'agent', 'citizen')),
+    arrondissement_id UUID, -- Rattachment local
+    role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'agent', 'citizen', 'ca_admin')), -- ca_admin = Chef Arrondissement
     full_name TEXT, -- Alignement React (Fix 500)
     avatar_url TEXT, -- Alignement React (Fix 500)
+    signature_url TEXT, -- Pour stocker le tracé de signature de l'admin
     is_approved BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -123,7 +125,7 @@ RETURNS BOOLEAN AS $$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
-        AND (role = 'super_admin' OR (role = 'admin' AND tenant_id = t_id))
+        AND (role = 'super_admin' OR (role IN ('admin', 'ca_admin') AND tenant_id = t_id))
     );
 $$ LANGUAGE sql SECURITY DEFINER;
 
@@ -132,7 +134,7 @@ RETURNS BOOLEAN AS $$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
-        AND (role = 'super_admin' OR (tenant_id = t_id AND role IN ('admin', 'agent')))
+        AND (role = 'super_admin' OR (tenant_id = t_id AND role IN ('admin', 'agent', 'ca_admin')))
     );
 $$ LANGUAGE sql SECURITY DEFINER;
 
@@ -197,6 +199,10 @@ CREATE TABLE dossiers (
     status_id TEXT NOT NULL REFERENCES dossier_statuses(id) DEFAULT 'BROUILLON',
     tracking_code TEXT UNIQUE NOT NULL,
     submission_data JSONB NOT NULL,
+    document_url TEXT, -- URL du PDF généré dans le bucket Supabase
+    signature_hash TEXT, -- Hash SHA-256 combinant (données + ID signataire)
+    signed_at TIMESTAMPTZ,
+    signed_by_id UUID REFERENCES user_profiles(id),
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -337,6 +343,25 @@ CREATE TABLE kpi_metrics (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Invitations pour création manuelle (Fix SuperAdmin)
+CREATE TABLE invitations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT UNIQUE NOT NULL,
+    tenant_id UUID REFERENCES tenants(id),
+    role TEXT NOT NULL,
+    full_name TEXT,
+    token TEXT UNIQUE NOT NULL,
+    is_used BOOLEAN DEFAULT false,
+    invited_by UUID REFERENCES user_profiles(id),
+    expires_at TIMESTAMPTZ DEFAULT (now() + interval '7 days'),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Super admins can manage invitations" ON invitations FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'super_admin')
+);
+
 -- ===============================================================
 -- 7. ENGAGEMENT CITOYEN (Pilier 8)
 -- ===============================================================
@@ -446,6 +471,75 @@ CREATE TABLE page_sections (
 -- ===============================================================
 -- 8. MODULES COMPLÉMENTAIRES (Pages Spécifiques)
 -- ===============================================================
+
+-- MODULE 1: GESTION DES MARCHÉS
+CREATE TABLE market_stands (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    market_name TEXT NOT NULL,
+    stand_number TEXT NOT NULL,
+    category TEXT, -- 'alimentation', 'tissus', 'divers'
+    status TEXT DEFAULT 'available' CHECK (status IN ('available', 'occupied', 'reserved', 'maintenance')),
+    monthly_rent DECIMAL(12,2),
+    location_data JSONB, -- Pour la carte interactive (coords, polygone)
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE market_registrations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    citizen_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+    stand_id UUID REFERENCES market_stands(id),
+    status TEXT DEFAULT 'submitted' CHECK (status IN ('submitted', 'under_review', 'approved', 'rejected', 'terminated')),
+    requested_market TEXT, -- Si stand non spécifié
+    requested_category TEXT,
+    contract_url TEXT,
+    last_payment_date DATE,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- MODULE 2: FONCIER URBAIN (ADC)
+CREATE TABLE land_dossiers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    citizen_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+    type TEXT DEFAULT 'ADC' CHECK (type IN ('ADC', 'PLU', 'BORNAGE')),
+    parcel_number TEXT,
+    location_description TEXT,
+    status TEXT DEFAULT 'submitted' CHECK (status IN ('submitted', 'under_review', 'field_visit', 'approved', 'rejected', 'completed')),
+    documents JSONB, -- {identity: url, purchase_act: url, topo_survey: url}
+    attestation_url TEXT, -- Signé numériquement
+    signature_data JSONB, -- Métadonnées de signature
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE field_visits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    land_dossier_id UUID NOT NULL REFERENCES land_dossiers(id) ON DELETE CASCADE,
+    visit_date TIMESTAMPTZ NOT NULL,
+    assigned_agents UUID[], -- IDs des agents (topo, foncier)
+    status TEXT DEFAULT 'planned' CHECK (status IN ('planned', 'completed', 'cancelled')),
+    report_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- MODULE 3: MOBILITÉ & TRANSPORTS
+CREATE TABLE transport_registrations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    citizen_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+    category TEXT NOT NULL CHECK (category IN ('zemidjan', 'taxi', 'transport_marchandises')),
+    vehicle_make TEXT,
+    vehicle_model TEXT,
+    chassis_number TEXT UNIQUE NOT NULL,
+    license_plate TEXT,
+    photo_url TEXT,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'under_review', 'approved', 'rejected', 'active', 'expired')),
+    license_url TEXT,
+    expiry_date DATE,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
 
 -- Conseil Municipal
 CREATE TABLE council_roles (
@@ -647,6 +741,11 @@ CREATE TABLE budget_votes (
 -- Activation RLS for new tables
 ALTER TABLE budget_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE budget_votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE market_stands ENABLE ROW LEVEL SECURITY;
+ALTER TABLE market_registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE land_dossiers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE field_visits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transport_registrations ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Budget projects are viewable by everyone" ON budget_projects FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can propose projects" ON budget_projects FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
@@ -701,20 +800,51 @@ ALTER TABLE polls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE poll_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE poll_votes ENABLE ROW LEVEL SECURITY;
 
--- POLITIQUES USER_PROFILES (Fix 403, 42P17)
-CREATE POLICY "Profiles viewable by owner or staff" ON user_profiles FOR SELECT USING (
-    auth.uid() = id OR 
+-- POLITIQUES MARCHÉS
+CREATE POLICY "Market stands are viewable by everyone" ON market_stands FOR SELECT USING (true);
+CREATE POLICY "Staff can manage stands" ON market_stands FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+CREATE POLICY "Users can view their own market registrations" ON market_registrations FOR SELECT USING (auth.uid() = citizen_id);
+CREATE POLICY "Users can apply for stands" ON market_registrations FOR INSERT WITH CHECK (auth.uid() = citizen_id);
+CREATE POLICY "Staff can manage market registrations" ON market_registrations FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+-- POLITIQUES FONCIER
+CREATE POLICY "Land dossiers are viewable by owner or staff" ON land_dossiers FOR SELECT USING (auth.uid() = citizen_id OR is_staff_for_tenant(tenant_id));
+CREATE POLICY "Users can submit land dossiers" ON land_dossiers FOR INSERT WITH CHECK (auth.uid() = citizen_id);
+CREATE POLICY "Staff can manage land dossiers" ON land_dossiers FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+CREATE POLICY "Field visits are viewable by staff or dossier owner" ON field_visits FOR SELECT USING (
+    is_staff_for_tenant(tenant_id) OR 
+    EXISTS (SELECT 1 FROM land_dossiers WHERE id = land_dossier_id AND citizen_id = auth.uid())
+);
+CREATE POLICY "Staff can manage field visits" ON field_visits FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+-- POLITIQUES ARRONDISSEMENTS
+CREATE POLICY "Chef Arrondissement can manage their arrondissement" ON user_profiles FOR ALL USING (
+    (role = 'ca_admin' AND arrondissement_id = (SELECT arrondissement_id FROM user_profiles WHERE id = auth.uid())) OR
     is_admin_for_tenant(tenant_id)
 );
-CREATE POLICY "Users can insert their own profile" ON user_profiles FOR INSERT WITH CHECK (auth.uid() = id); -- Fix 403
+CREATE POLICY "Super admins can manage all profiles" ON user_profiles FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'super_admin')
+);
+CREATE POLICY "Profiles viewable by owner or staff" ON user_profiles FOR SELECT USING (
+    auth.uid() = id OR 
+    is_admin_for_tenant(tenant_id) OR
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'super_admin')
+);
+CREATE POLICY "Users can insert their own profile" ON user_profiles FOR INSERT WITH CHECK (
+    (auth.uid() = id OR auth.uid() IS NULL) -- Allow signup when email confirmation is pending
+);
 CREATE POLICY "Users can update their own profile" ON user_profiles FOR UPDATE USING (auth.uid() = id);
 
--- POLITIQUES CITIZEN_PROFILES (Fix 42P17)
+-- POLITIQUES CITIZEN_PROFILES (Fix 42P17, Auth Signup)
 CREATE POLICY "Citizen profiles viewable by owner or staff" ON citizen_profiles FOR SELECT USING (
     auth.uid() = id OR 
     is_admin_for_tenant((SELECT tenant_id FROM user_profiles WHERE id = citizen_profiles.id))
 );
-CREATE POLICY "Users can insert their own citizen profile" ON citizen_profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can insert their own citizen profile" ON citizen_profiles FOR INSERT WITH CHECK (
+    (auth.uid() = id OR auth.uid() IS NULL)
+);
 CREATE POLICY "Users can update their own citizen profile" ON citizen_profiles FOR UPDATE USING (auth.uid() = id);
 
 -- POLITIQUES TENANTS & SERVICES (Public)
@@ -832,7 +962,14 @@ CREATE POLICY "Staff can view all reservations for their tenant" ON reservations
     is_staff_for_tenant(tenant_id)
 );
 
--- POLITIQUES DOSSIERS
+-- POLITIQUES TRANSPORTS
+CREATE POLICY "Public can verify transport registrations" ON transport_registrations FOR SELECT USING (true);
+CREATE POLICY "Users can view their own transport registrations" ON transport_registrations FOR SELECT USING (auth.uid() = citizen_id);
+CREATE POLICY "Users can register transport" ON transport_registrations FOR INSERT WITH CHECK (auth.uid() = citizen_id);
+CREATE POLICY "Staff can manage transport for their tenant" ON transport_registrations FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+-- POLITIQUES DOCUMENTS OFFICIELS
+CREATE POLICY "Public can view official documents by hash" ON dossiers FOR SELECT USING (true);
 CREATE POLICY "Dossiers viewable by owner or staff" ON dossiers FOR SELECT USING (
     citizen_id = auth.uid() OR 
     is_staff_for_tenant(tenant_id)
@@ -870,9 +1007,9 @@ CREATE TRIGGER update_dossiers_updated_at BEFORE UPDATE ON dossiers FOR EACH ROW
 CREATE OR REPLACE FUNCTION log_dossier_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF (OLD.status_id IS NULL OR OLD.status_id <> NEW.status_id) THEN
-        INSERT INTO dossier_history (tenant_id, dossier_id, status_id, notes)
-        VALUES (NEW.tenant_id, NEW.id, NEW.status_id, 'Changement automatique de statut');
+    IF (TG_OP = 'UPDATE' AND (OLD.status_id IS NULL OR OLD.status_id <> NEW.status_id)) THEN
+        INSERT INTO dossier_history (tenant_id, dossier_id, status_id, agent_id, notes)
+        VALUES (NEW.tenant_id, NEW.id, NEW.status_id, auth.uid(), 'Statut mis à jour de ' || COALESCE(OLD.status_id, 'NR') || ' à ' || NEW.status_id);
     END IF;
     RETURN NEW;
 END;

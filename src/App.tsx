@@ -43,6 +43,12 @@ const BudgetParticipatif = lazy(() => import('./pages/BudgetParticipatif').then(
 const OpenData = lazy(() => import('./pages/OpenData').then(m => ({ default: m.OpenData })));
 const Contact = lazy(() => import('./pages/Contact').then(m => ({ default: m.Contact })));
 
+const MarketModule = lazy(() => import('./pages/MarketModule').then(m => ({ default: m.MarketModule })));
+const LandModule = lazy(() => import('./pages/LandModule').then(m => ({ default: m.LandModule })));
+const TransportModule = lazy(() => import('./pages/TransportModule').then(m => ({ default: m.TransportModule })));
+const ArrondissementModule = lazy(() => import('./pages/ArrondissementModule').then(m => ({ default: m.ArrondissementModule })));
+
+const VerifyIdentity = lazy(() => import('./pages/VerifyIdentity').then(m => ({ default: m.VerifyIdentity })));
 const MinisterialDashboard = lazy(() => import('./pages/MinisterialDashboard').then(m => ({ default: m.MinisterialDashboard })));
 
 const NotFound = () => (
@@ -167,11 +173,17 @@ export default function App() {
                   <Route path="/:slug/budget-participatif" element={<TenantWrapper><BudgetParticipatif /></TenantWrapper>} />
                   <Route path="/:slug/open-data" element={<TenantWrapper><OpenData /></TenantWrapper>} />
                   <Route path="/:slug/contact" element={<TenantWrapper><Contact /></TenantWrapper>} />
+
+                  {/* Metropolitan Modules - Citizen Side */}
+                  <Route path="/:slug/services/mon-marche" element={<TenantWrapper><MarketModule isAdmin={false} /></TenantWrapper>} />
+                  <Route path="/:slug/services/foncier" element={<TenantWrapper><LandModule isAdmin={false} /></TenantWrapper>} />
+                  <Route path="/:slug/services/transport" element={<TenantWrapper><TransportModule isAdmin={false} /></TenantWrapper>} />
+                  <Route path="/:slug/services/arrondissement" element={<TenantWrapper><ArrondissementModule /></TenantWrapper>} />
                   
                   {/* Admin Routes - Protected */}
                   <Route path="/:slug/admin-portal" element={
                     <TenantWrapper>
-                      <ProtectedRoute allowedRoles={['admin', 'agent', 'super_admin']} requireTenant={true}>
+                      <ProtectedRoute allowedRoles={['admin', 'agent', 'super_admin', 'ca_admin']} requireTenant={true}>
                         <AdminPortal />
                       </ProtectedRoute>
                     </TenantWrapper>

@@ -14,10 +14,15 @@ import {
   User,
   Shield,
   CreditCard,
-  Bell
+  Bell,
+  Store,
+  Building2,
+  ShieldCheck,
+  MapPin
 } from 'lucide-react';
 import { Dossier, CitizenDocument } from '../types';
 import { cn } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export const CitizenSpace: React.FC = () => {
   const { user, profile } = useAuth();
@@ -25,8 +30,9 @@ export const CitizenSpace: React.FC = () => {
   const [documents, setDocuments] = useState<CitizenDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'dossiers' | 'documents' | 'payments' | 'profile'>('dossiers');
+  const [activeTab, setActiveTab] = useState<'dossiers' | 'documents' | 'payments' | 'services' | 'profile'>('dossiers');
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -107,6 +113,7 @@ export const CitizenSpace: React.FC = () => {
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
           {[
             { id: 'dossiers', label: 'Mes Dossiers', icon: FileText },
+            { id: 'services', label: 'Services Spécialisés', icon: MapPin },
             { id: 'documents', label: 'Coffre-fort', icon: Shield },
             { id: 'payments', label: 'Paiements', icon: CreditCard },
             { id: 'profile', label: 'Mon Profil', icon: User },
@@ -283,6 +290,65 @@ export const CitizenSpace: React.FC = () => {
                   )}
                 </motion.div>
               )}
+              {activeTab === 'services' && (
+                <motion.div
+                  key="services"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-6"
+                >
+                  {[
+                    { title: 'Marchés & Stands', desc: 'Gestion des étalages et baux commerciaux.', icon: Store, path: 'mon-marche', color: 'bg-orange-50 text-orange-600' },
+                    { title: 'Foncier (GUFU)', desc: 'Guichet unique pour vos dossiers fonciers.', icon: Building2, path: 'foncier', color: 'bg-blue-50 text-blue-600' },
+                    { title: 'Transport Pro', desc: 'Immatriculation Zemidjan et Taxis.', icon: ShieldCheck, path: 'transport', color: 'bg-emerald-50 text-emerald-600' },
+                    { title: 'Localité', desc: 'Démarches au niveau de l\'arrondissement.', icon: MapPin, path: 'arrondissement', color: 'bg-purple-50 text-purple-600' }
+                  ].map((s, i) => (
+                    <div key={i} className="bento-card p-6 group cursor-pointer hover:border-emerald-500/30 transition-all" onClick={() => navigate(`/cotonou/services/${s.path}`)}>
+                       <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110", s.color)}>
+                          <s.icon className="w-6 h-6" />
+                       </div>
+                       <h3 className="font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-tight">{s.title}</h3>
+                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">{s.desc}</p>
+                       <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                          Ouvrir le guichet
+                          <ChevronRight className="w-3 h-3" />
+                       </div>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+
+              {activeTab === 'profile' && (
+                <motion.div
+                  key="profile"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="bento-card p-8"
+                >
+                  <div className="flex items-center gap-6 mb-8">
+                    <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/20 rounded-3xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                      <User className="w-10 h-10" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{profile?.full_name}</h3>
+                      <p className="text-sm text-gray-500 uppercase font-bold tracking-widest">{profile?.role}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email</label>
+                       <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 text-sm font-medium dark:text-white">{user?.email}</div>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Identifiant Unique (NPI)</label>
+                       <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 text-sm font-medium dark:text-white">Non renseigné</div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
 
@@ -325,6 +391,33 @@ export const CitizenSpace: React.FC = () => {
                   </div>
                   <span className="text-sm font-display font-bold text-gray-900 dark:text-white">{dossiers.filter(d => d.status_id === 'TERMINÉ').length}</span>
                 </div>
+              </div>
+            </div>
+
+            {/* Metropolitan Services Quick Links */}
+            <div className="bento-card p-6 md:p-8 space-y-6">
+              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Services Métropole</h3>
+              <div className="grid grid-cols-1 gap-3">
+                {[
+                  { label: 'Marchés', icon: Store, path: 'mon-marche', color: 'bg-orange-50 text-orange-600' },
+                  { label: 'Foncier (GUFU)', icon: Building2, path: 'foncier', color: 'bg-blue-50 text-blue-600' },
+                  { label: 'Transport', icon: ShieldCheck, path: 'transport', color: 'bg-emerald-50 text-emerald-600' },
+                  { label: 'Décentralisation', icon: MapPin, path: 'arrondissement', color: 'bg-purple-50 text-purple-600' },
+                ].map((s, i) => (
+                  <button 
+                    key={i}
+                    onClick={() => window.location.href = `/${profile?.tenant_id}/services/${s.path}`}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 rounded-xl border border-transparent hover:border-gray-100 dark:hover:border-white/10 transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", s.color)}>
+                        <s.icon className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest">{s.label}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                  </button>
+                ))}
               </div>
             </div>
           </div>

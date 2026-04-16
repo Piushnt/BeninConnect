@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'admin' | 'agent' | 'citizen';
+export type UserRole = 'super_admin' | 'admin' | 'agent' | 'citizen' | 'ca_admin';
 
 export interface UserProfile {
   id: string;
@@ -7,6 +7,7 @@ export interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
   is_approved: boolean;
+  arrondissement_id?: string | null;
   created_at: string;
   updated_at: string;
 }

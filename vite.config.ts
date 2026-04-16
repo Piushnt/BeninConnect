@@ -12,6 +12,22 @@ export default defineConfig(({mode}) => {
       'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
       'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor': ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
+            'ui-libs': ['motion', 'lucide-react', 'clsx', 'tailwind-merge'],
+            'metropolis-modules': [
+              './src/pages/MarketModule',
+              './src/pages/LandModule',
+              './src/pages/TransportModule',
+              './src/pages/ArrondissementModule'
+            ]
+          }
+        }
+      }
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

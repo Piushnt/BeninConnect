@@ -43,6 +43,14 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const [editingTenant, setEditingTenant] = useState<any>(null);
   const [isAddingTenant, setIsAddingTenant] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: '',
+    fullName: '',
+    role: 'agent',
+    tenantId: ''
+  });
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [departments, setDepartments] = useState<any[]>([]);
 
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -102,6 +110,35 @@ export const SuperAdminDashboard: React.FC = () => {
     }
   };
 
+  const handleCreateUserInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingUser(true);
+    setFeedback(null);
+
+    try {
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      
+      const { error } = await supabase.from('invitations').insert({
+        email: newUser.email,
+        full_name: newUser.fullName,
+        role: newUser.role,
+        tenant_id: newUser.tenantId || null,
+        token: token,
+        invited_by: (await supabase.auth.getUser()).data.user?.id
+      });
+
+      if (error) throw error;
+
+      setFeedback({ type: 'success', msg: `Invitation envoyée avec succès à ${newUser.email}` });
+      setNewUser({ email: '', fullName: '', role: 'agent', tenantId: '' });
+    } catch (err: any) {
+      console.error('Invite error:', err);
+      setFeedback({ type: 'error', msg: err.message });
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
   const updateUserRole = async (userId: string, role: string, tenantId: string | null) => {
     try {
       const { error } = await supabase
@@ -130,16 +167,21 @@ export const SuperAdminDashboard: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: tenantsData, count, error } = await supabase
-        .from('tenants')
-        .select('*, departments(name), tenant_features(*)', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      const [tenantsRes, usersRes, dossiersRes] = await Promise.all([
+        supabase.from('tenants').select('*, departments(name), tenant_features(*)', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
+        supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('dossiers').select('*', { count: 'exact', head: true })
+      ]);
       
-      if (error) throw error;
-      setTenants(tenantsData || []);
-      setTotalItems(count || 0);
-      setStats(prev => ({ ...prev, totalTenants: count || 0 }));
+      if (tenantsRes.error) throw tenantsRes.error;
+      setTenants(tenantsRes.data || []);
+      setTotalItems(tenantsRes.count || 0);
+      setStats({
+        totalTenants: tenantsRes.count || 0,
+        activeUsers: usersRes.count || 0,
+        totalDossiers: dossiersRes.count || 0,
+        systemHealth: 'Optimal'
+      });
     } catch (error) {
       console.error('Error fetching super admin data:', error);
     } finally {
@@ -194,7 +236,8 @@ export const SuperAdminDashboard: React.FC = () => {
               { id: 'overview', label: 'Vue d\'ensemble', icon: LayoutDashboard },
               { id: 'tenants', label: 'Gestion Mairies', icon: Globe },
               { id: 'locations', label: 'Points d\'Intérêt', icon: MapPin },
-              { id: 'users', label: 'Candidatures Admins', icon: Users },
+              { id: 'users', label: 'Utilisateurs', icon: Users },
+              { id: 'user-creation', label: 'Créer un Acteur', icon: Plus },
               { id: 'logs', label: 'Logs Système', icon: Activity },
               { id: 'config', label: 'Configuration Cloud', icon: Settings },
             ].map((item, i) => (
@@ -243,13 +286,106 @@ export const SuperAdminDashboard: React.FC = () => {
           </header>
 
           {/* Stats Grid */}
+          {activeTab === 'user-creation' && (
+            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              <div className="bento-card p-8 bg-gradient-to-br from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 text-white dark:text-gray-900 relative overflow-hidden">
+                <div className="relative z-10">
+                  <h2 className="text-2xl font-display font-bold mb-2 uppercase tracking-tight">Nouvel Enregistrement Officiel</h2>
+                  <p className="opacity-80 text-sm max-w-md font-medium">Inscrivez les maires, agents techniques et chefs d'arrondissements pour ouvrir leurs accès administratifs.</p>
+                </div>
+                <Users className="absolute -right-4 -bottom-4 w-48 h-48 opacity-10 rotate-12" />
+              </div>
+
+              <div className="bento-card p-8">
+                {feedback && (
+                  <div className={cn(
+                    "p-4 rounded-2xl mb-6 text-sm font-bold animate-in fade-in slide-in-from-top-4",
+                    feedback.type === 'success' ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                  )}>
+                    {feedback.msg}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateUserInvite} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-bold text-gray-400 tracking-widest pl-1">Nom Complet</label>
+                      <input 
+                        type="text"
+                        required
+                        value={newUser.fullName}
+                        onChange={e => setNewUser({...newUser, fullName: e.target.value})}
+                        className="w-full bg-gray-100 dark:bg-white/5 border-transparent focus:bg-white dark:focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/20 rounded-2xl p-4 text-sm font-bold transition-all"
+                        placeholder="Ex: Jean GLOIRE"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-bold text-gray-400 tracking-widest pl-1">Adresse Email</label>
+                      <input 
+                        type="email"
+                        required
+                        value={newUser.email}
+                        onChange={e => setNewUser({...newUser, email: e.target.value})}
+                        className="w-full bg-gray-100 dark:bg-white/5 border-transparent focus:bg-white dark:focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/20 rounded-2xl p-4 text-sm font-bold transition-all"
+                        placeholder="jean@mairie.bj"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-bold text-gray-400 tracking-widest pl-1">Rôle Système</label>
+                      <select 
+                        value={newUser.role}
+                        onChange={e => setNewUser({...newUser, role: e.target.value})}
+                        className="w-full bg-gray-100 dark:bg-white/5 border-transparent focus:bg-white dark:focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/20 rounded-2xl p-4 text-sm font-bold transition-all"
+                      >
+                        <option value="citizen">Citoyen Béninois</option>
+                        <option value="agent">Agent de Mairie</option>
+                        <option value="admin">Administrateur (Maire/Adjoint)</option>
+                        <option value="ca_admin">Chef d'Arrondissement</option>
+                        <option value="super_admin">Super Administrateur</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-bold text-gray-400 tracking-widest pl-1">Commune Assignée</label>
+                      <select 
+                        value={newUser.tenantId}
+                        onChange={e => setNewUser({...newUser, tenantId: e.target.value})}
+                        className="w-full bg-gray-100 dark:bg-white/5 border-transparent focus:bg-white dark:focus:bg-white/10 focus:ring-2 focus:ring-emerald-500/20 rounded-2xl p-4 text-sm font-bold transition-all"
+                      >
+                        <option value="">Administration Centrale (Supérieure)</option>
+                        {tenants.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-4">
+                    <button 
+                      type="submit"
+                      disabled={isCreatingUser}
+                      className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-widest shadow-xl shadow-gray-900/10 dark:shadow-white/5 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                      {isCreatingUser ? (
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4" />
+                      )}
+                      {isCreatingUser ? 'Enregistrement...' : 'Valider l\'Enregistrement'}
+                    </button>
+                    <p className="text-[9px] text-center text-gray-400 mt-4 uppercase tracking-widest font-bold">L'utilisateur pourra ensuite activer son compte via son adresse email.</p>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'overview' && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 {[
                   { label: 'Mairies Actives', value: stats.totalTenants, icon: Globe, color: 'from-blue-500 to-cyan-400' },
-                  { label: 'Utilisateurs Cloud', value: '12.4K', icon: Users, color: 'from-purple-500 to-indigo-400' },
-                  { label: 'Dossiers Traités', value: '8.2K', icon: CheckCircle2, color: 'from-emerald-500 to-teal-400' },
+                  { label: 'Utilisateurs Cloud', value: stats.activeUsers, icon: Users, color: 'from-purple-500 to-indigo-400' },
+                  { label: 'Dossiers Traités', value: stats.totalDossiers, icon: CheckCircle2, color: 'from-emerald-500 to-teal-400' },
                   { label: 'Santé Système', value: stats.systemHealth, icon: Activity, color: 'from-amber-500 to-orange-400' },
                 ].map((stat, i) => (
                   <motion.div
