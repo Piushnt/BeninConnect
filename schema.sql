@@ -778,7 +778,7 @@ CREATE POLICY "Users can remove their own votes" ON poll_votes FOR DELETE USING 
 
 CREATE POLICY "Dossier history is viewable by owner and staff" ON dossier_history FOR SELECT USING (
     is_staff_for_tenant(tenant_id) OR 
-    EXISTS (SELECT 1 FROM dossiers WHERE id = dossier_id AND user_id = auth.uid())
+    EXISTS (SELECT 1 FROM dossiers WHERE id = dossier_id AND citizen_id = auth.uid())
 );
 
 CREATE POLICY "Citizen documents are viewable by owner and staff" ON citizen_documents FOR SELECT USING (
@@ -792,6 +792,11 @@ CREATE POLICY "Notification targets are viewable by recipient" ON notification_t
 );
 
 CREATE POLICY "Users can update their own notification status" ON notification_targets FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "News are viewable by everyone" ON news FOR SELECT USING (true);
+CREATE POLICY "Staff can manage news" ON news FOR ALL USING (
+    is_staff_for_tenant(tenant_id)
+);
 
 CREATE POLICY "News comments are viewable by everyone" ON news_comments FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can comment" ON news_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -835,25 +840,15 @@ CREATE POLICY "Dossiers viewable by owner or staff" ON dossiers FOR SELECT USING
 CREATE POLICY "Users can create their own dossiers" ON dossiers FOR INSERT WITH CHECK (auth.uid() = citizen_id OR is_staff_for_tenant(tenant_id));
 CREATE POLICY "Staff can update dossiers" ON dossiers FOR UPDATE USING (is_staff_for_tenant(tenant_id));
 
--- POLITIQUES NEWS (Public)
-CREATE POLICY "News are viewable by everyone" ON news FOR SELECT USING (true);
-CREATE POLICY "Staff can manage news" ON news FOR ALL USING (
+-- POLITIQUES SIGNALEMENTS
+CREATE POLICY "Signalements are viewable by owner and staff" ON signalements FOR SELECT USING (
+    citizen_id = auth.uid() OR 
     is_staff_for_tenant(tenant_id)
 );
+CREATE POLICY "Anyone can create signalements" ON signalements FOR INSERT WITH CHECK (true);
+CREATE POLICY "Staff can manage signalements" ON signalements FOR ALL USING (is_staff_for_tenant(tenant_id));
 
-CREATE POLICY "Comments are viewable by everyone" ON news_comments FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can comment" ON news_comments FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-
--- POLITIQUES LIKES & BOOKMARKS
-CREATE POLICY "Likes are viewable by everyone" ON news_likes FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can like" ON news_likes FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-CREATE POLICY "Users can unlike their own likes" ON news_likes FOR DELETE USING (auth.uid() = user_id);
-
-CREATE POLICY "Bookmarks are private to owner" ON news_bookmarks FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Authenticated users can bookmark" ON news_bookmarks FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-CREATE POLICY "Users can remove their own bookmarks" ON news_bookmarks FOR DELETE USING (auth.uid() = user_id);
-
-
+-- POLITIQUES NEWS (Public)
 -- ===============================================================
 -- 9. TRIGGERS & AUTOMATISATION
 -- ===============================================================
