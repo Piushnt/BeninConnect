@@ -204,6 +204,7 @@ CREATE TABLE dossiers (
 -- Historique des dossiers
 CREATE TABLE dossier_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     dossier_id UUID NOT NULL REFERENCES dossiers(id) ON DELETE CASCADE,
     status_id TEXT NOT NULL REFERENCES dossier_statuses(id),
     agent_id UUID REFERENCES user_profiles(id),
@@ -241,6 +242,7 @@ CREATE TABLE file_versions (
 -- Coffre-fort citoyen
 CREATE TABLE citizen_documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     citizen_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     file_id UUID NOT NULL REFERENCES file_storage(id) ON DELETE CASCADE,
     category TEXT CHECK (category IN ('identity', 'receipt', 'official_act')),
@@ -303,6 +305,7 @@ CREATE TABLE knowledge_base (
 -- Interactions IA (Pilier 7)
 CREATE TABLE ai_interactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     user_id UUID REFERENCES user_profiles(id),
     query TEXT NOT NULL,
     response TEXT NOT NULL,
@@ -346,6 +349,15 @@ CREATE TABLE push_subscriptions (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE user_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    preferences JSONB DEFAULT '{"news": true, "alerts": true, "events": true, "services": true}',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, tenant_id)
+);
+
 -- Signalements
 CREATE TABLE signalements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -381,6 +393,7 @@ CREATE TABLE news (
 -- Commentaires
 CREATE TABLE news_comments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     news_id UUID NOT NULL REFERENCES news(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
@@ -390,6 +403,7 @@ CREATE TABLE news_comments (
 
 -- Likes
 CREATE TABLE news_likes (
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     news_id UUID NOT NULL REFERENCES news(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -398,6 +412,7 @@ CREATE TABLE news_likes (
 
 -- Bookmarks (Favoris)
 CREATE TABLE news_bookmarks (
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     news_id UUID NOT NULL REFERENCES news(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -463,6 +478,7 @@ CREATE TABLE arrondissements (
 -- Adresses des arrondissements
 CREATE TABLE arrondissement_addresses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     arrondissement_id UUID NOT NULL REFERENCES arrondissements(id) ON DELETE CASCADE,
     label TEXT NOT NULL,
     value TEXT NOT NULL,
@@ -592,11 +608,13 @@ CREATE TABLE polls (
 
 CREATE TABLE poll_options (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     poll_id UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
     label TEXT NOT NULL
 );
 
 CREATE TABLE poll_votes (
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     poll_id UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
     option_id UUID NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -619,6 +637,7 @@ CREATE TABLE budget_projects (
 );
 
 CREATE TABLE budget_votes (
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     project_id UUID NOT NULL REFERENCES budget_projects(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -634,7 +653,7 @@ CREATE POLICY "Authenticated users can propose projects" ON budget_projects FOR 
 CREATE POLICY "Staff can manage budget projects" ON budget_projects FOR ALL USING (is_staff_for_tenant(tenant_id));
 
 CREATE POLICY "Budget votes are viewable by everyone" ON budget_votes FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can vote" ON budget_votes FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "Authenticated users can vote" ON budget_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can remove their own votes" ON budget_votes FOR DELETE USING (auth.uid() = user_id);
 
 -- ===============================================================
@@ -662,7 +681,7 @@ ALTER TABLE signalements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE news ENABLE ROW LEVEL SECURITY;
 ALTER TABLE news_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE news_likes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE news_bookmarks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE council_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE council_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE arrondissements ENABLE ROW LEVEL SECURITY;
@@ -750,8 +769,49 @@ CREATE POLICY "Staff can manage polls" ON polls FOR ALL USING (
 
 CREATE POLICY "Poll options are viewable by everyone" ON poll_options FOR SELECT USING (true);
 CREATE POLICY "Staff can manage poll options" ON poll_options FOR ALL USING (
-    EXISTS (SELECT 1 FROM polls WHERE id = poll_id AND is_staff_for_tenant(tenant_id))
+    is_staff_for_tenant(tenant_id)
 );
+
+CREATE POLICY "Poll votes are viewable by everyone" ON poll_votes FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can vote" ON poll_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can remove their own votes" ON poll_votes FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Dossier history is viewable by owner and staff" ON dossier_history FOR SELECT USING (
+    is_staff_for_tenant(tenant_id) OR 
+    EXISTS (SELECT 1 FROM dossiers WHERE id = dossier_id AND user_id = auth.uid())
+);
+
+CREATE POLICY "Citizen documents are viewable by owner and staff" ON citizen_documents FOR SELECT USING (
+    auth.uid() = citizen_id OR is_staff_for_tenant(tenant_id)
+);
+
+CREATE POLICY "Users can manage their own documents" ON citizen_documents FOR ALL USING (auth.uid() = citizen_id);
+
+CREATE POLICY "Notification targets are viewable by recipient" ON notification_targets FOR SELECT USING (
+    auth.uid() = user_id OR is_staff_for_tenant(tenant_id)
+);
+
+CREATE POLICY "Users can update their own notification status" ON notification_targets FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "News comments are viewable by everyone" ON news_comments FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can comment" ON news_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can manage their own comments" ON news_comments FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "News likes are viewable by everyone" ON news_likes FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can like" ON news_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can unlike" ON news_likes FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "News bookmarks are viewable by owner" ON news_bookmarks FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Authenticated users can bookmark" ON news_bookmarks FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can remove bookmarks" ON news_bookmarks FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Knowledge base is viewable by everyone" ON knowledge_base FOR SELECT USING (true);
+CREATE POLICY "Staff can manage knowledge base" ON knowledge_base FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+CREATE POLICY "Users can manage their own subscriptions" ON user_subscriptions FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "AI interactions are private" ON ai_interactions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Staff can view audit logs" ON audit_logs FOR SELECT USING (is_staff_for_tenant(tenant_id));
 
 -- POLITIQUES AUDIENCES
 CREATE POLICY "Users can view their own audiences" ON audiences FOR SELECT USING (auth.uid() = user_id);
@@ -816,8 +876,8 @@ CREATE OR REPLACE FUNCTION log_dossier_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
     IF (OLD.status_id IS NULL OR OLD.status_id <> NEW.status_id) THEN
-        INSERT INTO dossier_history (dossier_id, status_id, notes)
-        VALUES (NEW.id, NEW.status_id, 'Changement automatique de statut');
+        INSERT INTO dossier_history (tenant_id, dossier_id, status_id, notes)
+        VALUES (NEW.tenant_id, NEW.id, NEW.status_id, 'Changement automatique de statut');
     END IF;
     RETURN NEW;
 END;
