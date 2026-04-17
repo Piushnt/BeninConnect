@@ -29,6 +29,7 @@ export const LandModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false })
   const { user } = useAuth();
   const [dossiers, setDossiers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedDossier, setSelectedDossier] = useState<any>(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [newDossierType, setNewDossierType] = useState('ADC');
@@ -37,12 +38,12 @@ export const LandModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false })
     if (tenant) {
       fetchData();
     }
-  }, [tenant, isAdmin]);
+  }, [tenant, isAdmin, searchTerm]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const query = supabase
+      let query = supabase
         .from('land_dossiers')
         .select(`
           *,
@@ -52,7 +53,12 @@ export const LandModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false })
         .eq('tenant_id', tenant?.id);
       
       if (!isAdmin) {
-        query.eq('citizen_id', user?.id);
+        query = query.eq('citizen_id', user?.id);
+      }
+
+      if (searchTerm) {
+        // Since we want to search in join or specific fields
+        query = query.or(`dossier_type.ilike.%${searchTerm}%,citizen.full_name.ilike.%${searchTerm}%`);
       }
 
       const { data } = await query.order('created_at', { ascending: false });

@@ -27,6 +27,8 @@ export const MarketModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false 
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'stands' | 'applications'>('stands');
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedStand, setSelectedStand] = useState<any>(null);
   const [showApplyModal, setShowApplyModal] = useState(false);
 
@@ -34,16 +36,21 @@ export const MarketModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false 
     if (tenant) {
       fetchData();
     }
-  }, [tenant, isAdmin]);
+  }, [tenant, isAdmin, searchTerm]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: standsData } = await supabase
+      let standsQuery = supabase
         .from('market_stands')
         .select('*')
         .eq('tenant_id', tenant?.id);
       
+      if (searchTerm) {
+        standsQuery = standsQuery.or(`name.ilike.%${searchTerm}%,stand_number.ilike.%${searchTerm}%`);
+      }
+      
+      const { data: standsData } = await standsQuery;
       setStands(standsData || []);
 
       const query = supabase

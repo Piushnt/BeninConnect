@@ -5,11 +5,12 @@
 ## 🌟 Points Forts
 
 - **Multi-tenant Natif** : Une seule plateforme gérant 77 portails communaux isolés et personnalisables.
-- **E-Services Complets** : Digitalisation des actes d'état civil, certificats de résidence, et plus encore.
-- **Espace Citoyen Sécurisé** : Suivi des dossiers en temps réel et coffre-fort numérique pour les documents officiels.
+- **E-Services Complets** : Digitalisation des actes d'état civil, certificats de résidence, gestion foncière et des marchés.
+- **Espace Citoyen Sécurisé** : Suivi des dossiers en temps réel, coffre-fort numérique et signature électronique d'actes.
 - **IA Souveraine** : Assistant intelligent basé sur la technologie Gemini, alimenté par une base de connaissances officielle.
-- **Notifications Multi-canal** : Système d'alerte en temps réel pour les informations communales et nationales.
-- **Design Institutionnel** : Interface moderne, responsive et accessible, respectant les couleurs nationales du Bénin.
+- **Portail Admin Full-Responsive** : Console d'administration complète pour la gestion des communes, des services, et de la communication citoyenne.
+- **SEO & Performance** : Optimisation dynamique des métadonnées pour chaque commune (National & Local).
+- **Notifications Multi-canal** : Système d'alerte en temps réel via notifications in-app et push contextuels.
 
 ## 🛠️ Stack Technique
 

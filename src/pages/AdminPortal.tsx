@@ -33,7 +33,14 @@ import {
   Building2,
   ShieldCheck,
   Edit2,
-  X
+  X,
+  Zap,
+  Calendar,
+  Compass,
+  Eye,
+  Menu,
+  FileMinus,
+  MessageSquare
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -46,6 +53,7 @@ import { SignaturePad } from '../components/SignaturePad';
 import { generateSignatureHash } from '../lib/cryptoUtils';
 import { generateOfficialPDF } from '../lib/pdfGenerator';
 import { AnimatePresence } from 'motion/react';
+import { Helmet } from 'react-helmet-async';
 
 export const AdminPortal: React.FC = () => {
   const { tenant } = useTenant();
@@ -54,6 +62,7 @@ export const AdminPortal: React.FC = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAllDepts, setShowAllDepts] = useState(false);
   const [publicServices, setPublicServices] = useState<any[]>([]);
   const [tenantServices, setTenantServices] = useState<Record<string, any>>({});
@@ -70,6 +79,10 @@ export const AdminPortal: React.FC = () => {
   const [loadingNews, setLoadingNews] = useState(true);
   const [partners, setPartners] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [flashNews, setFlashNews] = useState<any[]>([]);
+  const [agendaEvents, setAgendaEvents] = useState<any[]>([]);
+  const [budgetProjects, setBudgetProjects] = useState<any[]>([]);
+  const [pageSections, setPageSections] = useState<any[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -82,6 +95,8 @@ export const AdminPortal: React.FC = () => {
   const [dossierNote, setDossierNote] = useState('');
   const [isSignMode, setIsSignMode] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [notificationData, setNotificationData] = useState({ title: '', body: '', target: 'all' });
   const [newDossier, setNewDossier] = useState({
     firstName: '',
     lastName: '',
@@ -100,8 +115,70 @@ export const AdminPortal: React.FC = () => {
       fetchPartners();
       fetchLocations();
       fetchNews();
+      fetchFlashNews();
+      fetchAgenda();
+      fetchBudget();
+      fetchPageSections();
     }
   }, [tenant, activeTab, currentPage, pageSize]);
+
+  const handleSendNotification = async () => {
+    if (!tenant || !notificationData.title || !notificationData.body) return;
+    
+    try {
+      const { data: notif, error: notifError } = await supabase
+        .from('notifications')
+        .insert({
+          tenant_id: tenant.id,
+          title: notificationData.title,
+          body: notificationData.body,
+          type: 'info'
+        })
+        .select()
+        .single();
+
+      if (notifError) throw notifError;
+
+      // target users
+      let userQuery = supabase.from('user_profiles').select('id').eq('tenant_id', tenant.id);
+      const { data: targetUsers } = await userQuery;
+
+      if (targetUsers && targetUsers.length > 0) {
+        const targets = targetUsers.map(u => ({
+          notification_id: notif.id,
+          user_id: u.id,
+          status: 'unread'
+        }));
+        await supabase.from('notification_targets').insert(targets);
+      }
+
+      setFeedback({ type: 'success', msg: 'Notification envoyée avec succès' });
+      setIsNotificationModalOpen(false);
+      setNotificationData({ title: '', body: '', target: 'all' });
+    } catch (err: any) {
+      setFeedback({ type: 'error', msg: `Erreur: ${err.message}` });
+    }
+  };
+
+  const fetchFlashNews = async () => {
+    const { data } = await supabase.from('flash_news').select('*').eq('tenant_id', tenant?.id).order('created_at', { ascending: false });
+    if (data) setFlashNews(data);
+  };
+
+  const fetchAgenda = async () => {
+    const { data } = await supabase.from('agenda_events').select('*').eq('tenant_id', tenant?.id).order('event_date', { ascending: false });
+    if (data) setAgendaEvents(data);
+  };
+
+  const fetchBudget = async () => {
+    const { data } = await supabase.from('budget_projects').select('*, author:user_profiles(*)').eq('tenant_id', tenant?.id).order('created_at', { ascending: false });
+    if (data) setBudgetProjects(data);
+  };
+
+  const fetchPageSections = async () => {
+    const { data } = await supabase.from('page_sections').select('*').eq('tenant_id', tenant?.id);
+    if (data) setPageSections(data);
+  };
 
   const fetchServices = async () => {
     const { data: pub } = await supabase.from('public_services').select('*');
@@ -390,69 +467,64 @@ export const AdminPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] transition-colors duration-300 relative overflow-hidden font-sans">
+      <Helmet>
+        <title>Console Admin | {tenant?.name || 'Bénin Connect'}</title>
+        <meta name="description" content={`Gestion administrative de la commune de ${tenant?.name}`} />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      
       {/* Background Glows */}
       <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[150px] rounded-full pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-secondary/10 blur-[150px] rounded-full pointer-events-none" />
 
+      {/* Mobile Header */}
+      <div className="lg:hidden flex items-center justify-between p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b dark:border-white/5 sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
+            <Building2 className="w-4 h-4" />
+          </div>
+          <span className="font-bold text-sm tracking-tight truncate max-w-[150px]">{tenant?.name}</span>
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
+          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
+
       <div className="flex relative z-10">
-        {/* Sidebar - Neo-Glassmorphism Floating */}
+        {/* Mobile Navigation Drawer */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+             <>
+               <motion.div 
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 exit={{ opacity: 0 }}
+                 onClick={() => setIsMobileMenuOpen(false)}
+                 className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] lg:hidden" 
+               />
+               <motion.aside 
+                 initial={{ x: '-100%' }}
+                 animate={{ x: 0 }}
+                 exit={{ x: '-100%' }}
+                 className="fixed inset-y-0 left-0 w-72 bg-white dark:bg-gray-950 z-[70] p-6 lg:hidden flex flex-col shadow-2xl"
+               >
+                 <SideNavContent 
+                  activeTab={activeTab} 
+                  setActiveTab={(tab: string) => { setActiveTab(tab); setIsMobileMenuOpen(false); }} 
+                  profile={profile} 
+                 />
+               </motion.aside>
+             </>
+          )}
+        </AnimatePresence>
+
+        {/* Desktop Sidebar - Neo-Glassmorphism Floating */}
         <aside className="w-72 h-[calc(100vh-48px)] sticky top-6 ml-6 my-6 bg-white/40 dark:bg-[#131B2B]/40 backdrop-blur-2xl border border-white/40 dark:border-white/5 p-8 hidden lg:flex flex-col shadow-2xl rounded-[40px] overflow-hidden transition-all">
-          <div className="flex items-center gap-4 mb-12">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#008751] to-emerald-400 rounded-2xl flex items-center justify-center text-white shadow-xl">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-[#008751] uppercase tracking-[0.3em] leading-tight mb-1 truncate max-w-[150px]">{tenant?.name}</span>
-              <span className="text-lg font-display font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Console Admin</span>
-            </div>
-          </div>
-
-          <nav className="space-y-3 flex-grow overflow-y-auto no-scrollbar pr-2">
-            {[
-              { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-              { id: 'dossiers', label: 'Gestion Dossiers', icon: FileText },
-              { id: 'services', label: 'Services Mairie', icon: ShieldCheck },
-              { id: 'users', label: 'Citoyens & Staff', icon: Users },
-              { id: 'signalements', label: 'Signalements', icon: AlertCircle },
-              { id: 'market', label: 'Marchés Urbains', icon: Store },
-              { id: 'land', label: 'Gestion Foncière', icon: MapPin },
-              { id: 'transport', label: 'Transports', icon: Map },
-              { id: 'arrondissement', label: 'Arrondissements', icon: Building2 },
-              { id: 'news', label: 'Actualités', icon: Bell },
-              { id: 'config', label: 'Paramètres', icon: Settings },
-            ].map((item) => (
-              <button 
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={cn(
-                  "w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all relative group",
-                  activeTab === item.id 
-                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-xl" 
-                    : "text-gray-500 hover:bg-white/50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
-                )}
-              >
-                {activeTab === item.id && (
-                  <motion.div layoutId="nav-glow-admin" className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 blur-xl px-2" />
-                )}
-                <item.icon className={cn("w-5 h-5 relative z-10 transition-transform group-hover:scale-110", activeTab === item.id ? "text-secondary" : "")} />
-                <span className="relative z-10">{item.label}</span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="pt-6 border-t border-gray-100 dark:border-white/10 mt-6">
-            <button 
-              onClick={() => navigate('/')}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-rose-500 transition-all"
-            >
-              <ExternalLink className="w-5 h-5" />
-              Retour Site
-            </button>
-          </div>
+           <SideNavContent activeTab={activeTab} setActiveTab={setActiveTab} profile={profile} />
         </aside>
 
         {/* Main Workspace */}
-        <main className="flex-grow p-6 lg:p-12 max-w-[1500px] mx-auto space-y-12 h-screen overflow-y-auto no-scrollbar">
+        <main className="flex-grow p-4 lg:p-12 max-w-[1500px] mx-auto space-y-12 h-screen overflow-y-auto no-scrollbar">
           {/* Top Control Bar */}
           <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-4">
             <div className="space-y-2">
@@ -487,6 +559,19 @@ export const AdminPortal: React.FC = () => {
 
           {activeTab === 'dashboard' && (
             <div className="space-y-12 animate-in fade-in duration-700">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                <div className="space-y-1">
+                  <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Statistiques Globales</h2>
+                  <div className="h-1 w-12 bg-primary rounded-full" />
+                </div>
+                <button 
+                  onClick={() => setIsNotificationModalOpen(true)}
+                  className="px-8 py-4 bg-primary text-white rounded-2xl flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <Bell className="w-4 h-4" />
+                  Envoyer une Alerte
+                </button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {[
                   { label: 'Dossiers', value: totalItems, icon: FileText, color: 'from-[#008751] to-emerald-400' },
@@ -799,71 +884,248 @@ export const AdminPortal: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'polls' && (
-          <div className="space-y-8">
-            <div className="bento-card p-6 md:p-8 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-display font-bold dark:text-white">Participation Citoyenne</h2>
-                <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Sondages et consultations publiques</p>
+        {activeTab === 'social' && (
+          <div className="space-y-12 animate-in fade-in duration-700">
+            <div className="flex justify-between items-center">
+              <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase">Communication Flash & Agenda</h2>
+              <div className="flex gap-4">
+                 <button className="btn-primary" onClick={() => {/* logic */}}>Nouveau Flash</button>
+                 <button className="btn-primary" onClick={() => {/* logic */}}>Nouvel Événement</button>
               </div>
-              <button className="btn-primary">Nouveau Sondage</button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {polls.map(poll => (
-                <div key={poll.id} className="bento-card p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-lg dark:text-white leading-tight">{poll.question}</h3>
-                    <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-bold uppercase tracking-widest">ACTIF</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               <div className="card-glass p-8 space-y-6">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    Fil d'Infos Flash
+                  </h3>
+                  <div className="space-y-4">
+                     {flashNews.map(f => (
+                       <div key={f.id} className="p-4 bg-white/50 dark:bg-white/5 rounded-2xl flex justify-between items-center">
+                          <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{f.content}</p>
+                          <button onClick={async () => {
+                             await supabase.from('flash_news').delete().eq('id', f.id);
+                             fetchFlashNews();
+                          }} className="text-red-500 hover:scale-110 transition-transform"><Trash2 className="w-4 h-4" /></button>
+                       </div>
+                     ))}
                   </div>
-                  <div className="space-y-3">
-                    {poll.poll_options?.map((opt: any) => (
-                      <div key={opt.id} className="space-y-1">
-                        <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-gray-500">
-                          <span>{opt.text}</span>
-                          <span>{opt.votes_count || 0} votes</span>
-                        </div>
-                        <div className="h-1.5 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
-                           <motion.div 
-                             initial={{ width: 0 }}
-                             animate={{ width: `${(opt.votes_count / (poll.total_votes || 1)) * 100}%` }}
-                             className="h-full bg-emerald-500"
-                           />
-                        </div>
-                      </div>
-                    ))}
+               </div>
+
+               <div className="card-glass p-8 space-y-6">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Agenda Municipal
+                  </h3>
+                  <div className="space-y-4">
+                     {agendaEvents.map(e => (
+                       <div key={e.id} className="p-4 bg-white/50 dark:bg-white/5 rounded-2xl flex justify-between items-center">
+                          <div>
+                            <p className="text-xs font-black text-gray-900 dark:text-white uppercase">{e.title}</p>
+                            <p className="text-[10px] text-gray-500 font-bold">{formatDate(e.event_date)}</p>
+                          </div>
+                          <button className="text-gray-400 hover:text-primary"><Edit2 className="w-4 h-4" /></button>
+                       </div>
+                     ))}
                   </div>
-                </div>
-              ))}
+               </div>
+            </div>
+
+            <div className="card-glass p-8 space-y-6">
+               <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                 <Compass className="w-4 h-4" />
+                 Guide Touristique & POI
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {locations.filter(l => l.category === 'tourisme' || activeTab === 'social').map(loc => (
+                    <div key={loc.id} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl space-y-3">
+                       <div className="h-32 bg-gray-200 dark:bg-white/10 rounded-xl overflow-hidden">
+                          {loc.image_url && <img src={loc.image_url} alt="" className="w-full h-full object-cover" />}
+                       </div>
+                       <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white truncate">{loc.name}</h4>
+                    </div>
+                  ))}
+               </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'locations' && (
-          <div className="space-y-8">
-            <div className="bento-card p-6 md:p-8 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-display font-bold dark:text-white">Carte & Lieux d'Intérêt</h2>
-                <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Gérez les points d'intérêt sur la carte interactive</p>
+        {activeTab === 'engagement' && (
+           <div className="space-y-12 animate-in fade-in duration-700">
+             <div className="flex justify-between items-center">
+               <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase">Sondages & Budget Participatif</h2>
+               <button className="btn-primary">Lancer une Consultation</button>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {budgetProjects.map(proj => (
+                  <div key={proj.id} className="card-glass p-8 space-y-4">
+                     <div className="flex justify-between items-start">
+                        <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">{proj.status}</span>
+                        <span className="text-[10px] font-black text-gray-400">{formatDate(proj.created_at)}</span>
+                     </div>
+                     <h3 className="text-xl font-display font-black text-gray-900 dark:text-white uppercase leading-tight">{proj.title}</h3>
+                     <p className="text-xs text-gray-500 dark:text-gray-400 font-bold leading-relaxed">{proj.description}</p>
+                     <div className="pt-4 border-t border-gray-100 dark:border-white/5 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                           <div className="w-6 h-6 bg-gray-100 rounded-full" />
+                           <span className="text-[10px] font-black text-gray-600 uppercase">{proj.author?.full_name}</span>
+                        </div>
+                        <button className="text-xs font-black text-primary uppercase tracking-widest hover:underline">Voter & Voir</button>
+                     </div>
+                  </div>
+                ))}
+             </div>
+           </div>
+        )}
+
+        {activeTab === 'content' && (
+           <div className="space-y-12 animate-in fade-in duration-700">
+              <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase">Gestion du Contenu (CMS)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                 {[
+                   { id: 'history', label: 'Histoire & Vision', icon: Eye },
+                   { id: 'transparency', label: 'Transparence Municipale', icon: ShieldCheck },
+                   { id: 'council', label: 'Conseil Municipal', icon: Users },
+                   { id: 'arrondissements', label: 'Détails Arrondissements', icon: Map },
+                   { id: 'reports', label: 'Rapports & Comptes Rendus', icon: FileText }
+                 ].map(item => (
+                   <button key={item.id} className="card-glass p-10 text-center space-y-6 group hover:border-primary/50 transition-all">
+                      <div className="w-16 h-16 bg-primary/10 rounded-[28px] mx-auto flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                         <item.icon className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-[0.2em]">{item.label}</h3>
+                      <button className="text-[10px] font-black text-primary uppercase tracking-widest border border-primary/20 px-4 py-2 rounded-xl group-hover:bg-primary group-hover:text-white transition-all">Gérer la page</button>
+                   </button>
+                 ))}
               </div>
-              <button className="btn-primary">Ajouter un Lieu</button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-               {locations.map(loc => (
-                 <div key={loc.id} className="bento-card p-4 flex flex-col gap-3">
-                    <div className="h-24 bg-gray-100 dark:bg-white/5 rounded-xl overflow-hidden">
-                       {loc.image_url ? <img src={loc.image_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><MapPin /></div>}
+           </div>
+        )}
+
+        {activeTab === 'config' && (
+           <div className="space-y-12 animate-in fade-in duration-700">
+              <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase">Configuration & Tarifs</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                 <div className="card-glass p-8 space-y-8">
+                    <h3 className="text-sm font-black uppercase text-primary tracking-widest border-b pb-4">Taux & Fiscalité</h3>
+                    <div className="space-y-4">
+                       <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-500 uppercase">Taux TFU (Valeur Locative)</span>
+                          <input type="text" defaultValue="0.1%" className="bg-gray-50 dark:bg-white/5 border px-4 py-2 rounded-xl text-xs font-black w-24 text-right" />
+                       </div>
+                       <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-500 uppercase">Patente (Base Minimum)</span>
+                          <input type="text" defaultValue="5.000 CFA" className="bg-gray-50 dark:bg-white/5 border px-4 py-2 rounded-xl text-xs font-black w-32 text-right" />
+                       </div>
                     </div>
-                    <div>
-                       <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{loc.category}</p>
-                       <h4 className="font-bold text-sm dark:text-white">{loc.name}</h4>
+                    <button className="w-full btn-primary py-4">Enregistrer les Tarifs</button>
+                 </div>
+
+                 <div className="card-glass p-8 space-y-8">
+                    <h3 className="text-sm font-black uppercase text-primary tracking-widest border-b pb-4">Gestion des Formulaires PDF</h3>
+                    <div className="space-y-4">
+                       {[1, 2].map(i => (
+                         <div key={i} className="flex justify-between items-center p-4 bg-white/50 dark:bg-white/5 rounded-2xl">
+                            <div className="flex items-center gap-3">
+                               <FileMinus className="w-4 h-4 text-rose-500" />
+                               <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Formulaire_{i}.pdf</span>
+                            </div>
+                            <div className="flex gap-2">
+                               <button className="text-gray-400 hover:text-primary"><Edit2 className="w-4 h-4" /></button>
+                               <button className="text-gray-400 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                         </div>
+                       ))}
+                       <button className="w-full border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-primary hover:text-primary transition-all">+ Ajouter un PDF officiel</button>
                     </div>
                  </div>
-               ))}
+              </div>
+           </div>
+        )}
+
+        {/* Existing Modules integrated within activeTab */}
+        {activeTab === 'market' && <MarketModule isAdmin={true} />}
+        {activeTab === 'land' && <LandModule isAdmin={true} />}
+        {activeTab === 'transport' && <TransportModule isAdmin={true} />}
+        {activeTab === 'users' && (
+          <div className="space-y-12 animate-in fade-in duration-700">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="space-y-1">
+                <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Citoyens & Staff</h2>
+                <div className="h-1 w-12 bg-primary rounded-full" />
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.3em] mt-3">Gérer les accès et les rôles de la commune</p>
+              </div>
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Rechercher par nom..." 
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="w-full pl-11 pr-4 py-4 bg-white/50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="card-glass overflow-hidden border-none shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Utilisateur</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Rôle Actuel</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                    {loadingUsers ? (
+                      <tr><td colSpan={3} className="px-8 py-20 text-center animate-pulse font-black text-gray-400 uppercase tracking-widest text-xs">Chargement...</td></tr>
+                    ) : allUsers.map((u, i) => (
+                      <motion.tr 
+                        key={u.id}
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="group hover:bg-gray-50/50 dark:hover:bg-white/5 transition-all"
+                      >
+                        <td className="px-8 py-8">
+                           <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-black uppercase text-xs">{u.full_name?.charAt(0)}</div>
+                              <span className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">{u.full_name}</span>
+                           </div>
+                        </td>
+                        <td className="px-8 py-8">
+                           <span className={cn(
+                             "inline-flex px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest",
+                             u.role === 'super_admin' ? "bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400" :
+                             u.role === 'admin' ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" :
+                             "bg-gray-50 text-gray-500 dark:bg-white/5 dark:text-gray-400"
+                           )}>
+                             {u.role}
+                           </span>
+                        </td>
+                        <td className="px-8 py-8">
+                           <select 
+                            onChange={(e) => handleElevateRole(u.id, e.target.value)}
+                            value={u.role}
+                            className="bg-white dark:bg-gray-800 border-gray-100 dark:border-white/10 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-primary/20"
+                           >
+                             <option value="citizen">Citoyen</option>
+                             <option value="agent">Agent</option>
+                             <option value="admin">Admin</option>
+                             <option value="super_admin">Super Admin</option>
+                           </select>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
+
 
         {/* ... Other tabs ... */}
         {activeTab === 'services' && (
@@ -943,6 +1205,52 @@ export const AdminPortal: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {isNotificationModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white dark:bg-gray-950 rounded-[40px] w-full max-w-xl p-10 space-y-8 shadow-2xl overflow-hidden relative"
+           >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[60px] rounded-full -mr-16 -mt-16" />
+              <div className="flex justify-between items-center relative z-10">
+                 <h3 className="text-2xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Nouvelle Alerte Citoyenne</h3>
+                 <button onClick={() => setIsNotificationModalOpen(false)} className="text-gray-400 hover:text-rose-500 transition-colors"><X /></button>
+              </div>
+
+              <div className="space-y-6 relative z-10">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Titre de l'alerte</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: Coupure d'eau, Conseil Municipal..."
+                      value={notificationData.title}
+                      onChange={(e) => setNotificationData({...notificationData, title: e.target.value})}
+                      className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Message</label>
+                    <textarea 
+                      placeholder="Contenu détaillé de la notification..."
+                      rows={4}
+                      value={notificationData.body}
+                      onChange={(e) => setNotificationData({...notificationData, body: e.target.value})}
+                      className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                    />
+                 </div>
+                 <button 
+                  onClick={handleSendNotification}
+                  className="w-full py-5 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                 >
+                    <Bell className="w-4 h-4" />
+                    Diffuser la Notification
+                 </button>
+              </div>
+           </motion.div>
+        </div>
+      )}
 
       {selectedDossier && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1063,6 +1371,91 @@ export const AdminPortal: React.FC = () => {
           </motion.div>
         </div>
       )}
+    </div>
+  );
+};
+
+const SideNavContent = ({ activeTab, setActiveTab, profile }: any) => {
+  const navigate = useNavigate();
+  const { tenant } = useTenant();
+  
+  const navItems = [
+    { title: 'Principal', items: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'dossiers', label: 'Dossiers', icon: FileText },
+      { id: 'news', label: 'Actualités', icon: ImageIcon },
+      { id: 'social', label: 'Communication', icon: MessageSquare },
+      { id: 'signalements', label: 'Signalements', icon: AlertCircle },
+    ]},
+    { title: 'Services & Engagement', items: [
+      { id: 'services', label: 'Catalogue', icon: Database },
+      { id: 'engagement', label: 'Engagement', icon: Vote },
+      { id: 'locations', label: 'Carte', icon: MapPin },
+    ]},
+    { title: 'Modules Spécifiques', items: [
+      { id: 'market', label: 'Marché', icon: Store },
+      { id: 'land', label: 'Foncier', icon: Building2 },
+      { id: 'transport', label: 'Transport', icon: ShieldCheck },
+      { id: 'arrondissement', label: 'Arrondi.', icon: Map },
+    ]},
+    { title: 'Administration', items: [
+      { id: 'users', label: 'Utilisateurs', icon: Users },
+      { id: 'content', label: 'Pages', icon: Eye },
+      { id: 'config', label: 'Réglages', icon: Settings },
+    ]}
+  ];
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center gap-4 mb-12">
+        <div className="w-12 h-12 bg-gradient-to-br from-[#008751] to-emerald-400 rounded-2xl flex items-center justify-center text-white shadow-xl">
+          <Building2 className="w-6 h-6" />
+        </div>
+        <div className="flex flex-col overflow-hidden">
+          <span className="text-[10px] font-black text-[#008751] uppercase tracking-[0.3em] leading-tight mb-1 truncate">{tenant?.name}</span>
+          <span className="text-lg font-display font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Console</span>
+        </div>
+      </div>
+
+      <nav className="space-y-8 flex-grow overflow-y-auto no-scrollbar pr-2">
+        {navItems.map((group, idx) => (
+          <div key={idx} className="space-y-2">
+            <h4 className="px-6 text-[8px] font-black text-gray-400 uppercase tracking-[0.3em] font-mono">{group.title}</h4>
+            <div className="space-y-1">
+              {group.items.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={cn(
+                    "w-full flex items-center gap-4 px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300",
+                    activeTab === item.id 
+                      ? "bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]" 
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
+                  )}
+                >
+                  <item.icon className={cn("w-4 h-4 transition-transform duration-500", activeTab === item.id && "scale-110")} />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {profile?.role === 'super_admin' && (
+          <button
+            onClick={() => navigate('/super-admin')}
+            className="w-full mt-4 flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] bg-gray-900 text-white shadow-xl group border border-white/10"
+          >
+            <ShieldCheck className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+            Super Admin
+          </button>
+        )}
+      </nav>
+
+      <button className="mt-8 flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all group shrink-0">
+        <X className="w-4 h-4" />
+        Déconnexion
+      </button>
     </div>
   );
 };
