@@ -34,7 +34,7 @@ export const SubscriptionManager: React.FC = () => {
         .select('*')
         .eq('user_id', user.id)
         .eq('tenant_id', tenant?.id || null)
-        .single();
+        .maybeSingle();
 
       if (data) setIsSubscribed(true);
     } catch (err) {

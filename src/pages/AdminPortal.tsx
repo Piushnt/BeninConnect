@@ -120,7 +120,7 @@ export const AdminPortal: React.FC = () => {
     setLoadingDossiers(true);
     const { data, count } = await supabase
       .from('dossiers')
-      .select('*, tenant_service:tenant_services(service:public_services(*)), citizen:profiles(*)', { count: 'exact' })
+      .select('*, tenant_service:tenant_services(service:public_services(*)), citizen:user_profiles(*)', { count: 'exact' })
       .eq('tenant_id', tenant?.id)
       .order('created_at', { ascending: false })
       .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
@@ -389,227 +389,346 @@ export const AdminPortal: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] flex transition-colors duration-300 relative overflow-hidden">
-      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] transition-colors duration-300 relative overflow-hidden font-sans">
+      {/* Background Glows */}
+      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-secondary/10 blur-[150px] rounded-full pointer-events-none" />
 
-      <aside className="w-64 bg-white/60 dark:bg-[#131B2B]/60 backdrop-blur-xl border-r border-gray-200 dark:border-white/5 flex flex-col p-6 space-y-8 transition-colors relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)] dark:shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-400 rounded-xl flex items-center justify-center text-white shadow-lg">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-lg font-black uppercase tracking-tighter dark:text-white">GouvAdmin</h1>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{tenant?.name}</p>
-          </div>
-        </div>
-
-        <nav className="flex-grow space-y-2 overflow-y-auto">
-          {[
-            { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-            { id: 'dossiers', label: 'Gestion Dossiers', icon: FileText },
-            { id: 'markets', label: 'Marchés', icon: Store },
-            { id: 'land', label: 'Foncier (GUFU)', icon: Building2 },
-            { id: 'transport', label: 'Transports', icon: ShieldCheck },
-            { id: 'districts', label: 'Arrondissements', icon: MapPin },
-            { id: 'news', label: 'Actualités', icon: FileText },
-            { id: 'signalements', label: 'Signalements', icon: AlertCircle },
-            { id: 'users', label: 'Citoyens & Agents', icon: Users },
-            { id: 'polls', label: 'Sondages', icon: Vote },
-            { id: 'locations', label: 'Carte & POIs', icon: MapPin },
-            { id: 'partners', label: 'Partenaires', icon: Handshake },
-            { id: 'settings', label: 'Configuration', icon: Settings },
-          ].map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                activeTab === item.id 
-                  ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-lg" 
-                  : "text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5"
-              )}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      <main className="flex-grow p-6 md:p-10 overflow-y-auto relative z-10 max-w-[1400px] mx-auto">
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { label: 'Dossiers', value: totalItems, icon: FileText, color: 'emerald' },
-                { label: 'Signalements', value: signalements.length, icon: AlertCircle, color: 'blue' },
-                { label: 'Utilisateurs', value: allUsers.length, icon: Users, color: 'purple' },
-                { label: 'Sondages', value: polls.length, icon: Vote, color: 'orange' }
-              ].map((stat, i) => (
-                <div key={i} className="bento-card p-6 flex items-center gap-4">
-                  <div className={cn("p-4 rounded-2xl", `bg-${stat.color}-500/10 text-${stat.color}-500`)}>
-                    <stat.icon className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                    <p className="text-2xl font-black dark:text-white">{stat.value}</p>
-                  </div>
-                </div>
-              ))}
+      <div className="flex relative z-10">
+        {/* Sidebar - Neo-Glassmorphism Floating */}
+        <aside className="w-72 h-[calc(100vh-48px)] sticky top-6 ml-6 my-6 bg-white/40 dark:bg-[#131B2B]/40 backdrop-blur-2xl border border-white/40 dark:border-white/5 p-8 hidden lg:flex flex-col shadow-2xl rounded-[40px] overflow-hidden transition-all">
+          <div className="flex items-center gap-4 mb-12">
+            <div className="w-12 h-12 bg-gradient-to-br from-[#008751] to-emerald-400 rounded-2xl flex items-center justify-center text-white shadow-xl">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-[#008751] uppercase tracking-[0.3em] leading-tight mb-1 truncate max-w-[150px]">{tenant?.name}</span>
+              <span className="text-lg font-display font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Console Admin</span>
             </div>
           </div>
-        )}
+
+          <nav className="space-y-3 flex-grow overflow-y-auto no-scrollbar pr-2">
+            {[
+              { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+              { id: 'dossiers', label: 'Gestion Dossiers', icon: FileText },
+              { id: 'services', label: 'Services Mairie', icon: ShieldCheck },
+              { id: 'users', label: 'Citoyens & Staff', icon: Users },
+              { id: 'signalements', label: 'Signalements', icon: AlertCircle },
+              { id: 'market', label: 'Marchés Urbains', icon: Store },
+              { id: 'land', label: 'Gestion Foncière', icon: MapPin },
+              { id: 'transport', label: 'Transports', icon: Map },
+              { id: 'arrondissement', label: 'Arrondissements', icon: Building2 },
+              { id: 'news', label: 'Actualités', icon: Bell },
+              { id: 'config', label: 'Paramètres', icon: Settings },
+            ].map((item) => (
+              <button 
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all relative group",
+                  activeTab === item.id 
+                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-xl" 
+                    : "text-gray-500 hover:bg-white/50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                )}
+              >
+                {activeTab === item.id && (
+                  <motion.div layoutId="nav-glow-admin" className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 blur-xl px-2" />
+                )}
+                <item.icon className={cn("w-5 h-5 relative z-10 transition-transform group-hover:scale-110", activeTab === item.id ? "text-secondary" : "")} />
+                <span className="relative z-10">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="pt-6 border-t border-gray-100 dark:border-white/10 mt-6">
+            <button 
+              onClick={() => navigate('/')}
+              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-rose-500 transition-all"
+            >
+              <ExternalLink className="w-5 h-5" />
+              Retour Site
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Workspace */}
+        <main className="flex-grow p-6 lg:p-12 max-w-[1500px] mx-auto space-y-12 h-screen overflow-y-auto no-scrollbar">
+          {/* Top Control Bar */}
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-4">
+            <div className="space-y-2">
+              <h1 className="text-4xl md:text-5xl font-display font-black text-gray-900 dark:text-white tracking-tighter uppercase">
+                {activeTab === 'dashboard' ? 'Tableau de bord' : activeTab.replace('-', ' ')}
+              </h1>
+              <div className="flex items-center gap-4">
+                <div className="h-1.5 w-16 bg-[#008751] rounded-full" />
+                <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">Mairie de {tenant?.name}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={toggleTheme}
+                className="w-12 h-12 bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-white/40 dark:border-white/5 rounded-2xl flex items-center justify-center text-gray-500 dark:text-gray-400 hover:scale-110 transition-all shadow-xl"
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+              <div className="h-12 w-px bg-gray-200 dark:bg-white/10 mx-2" />
+              <div className="flex items-center gap-4 px-5 py-3 bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-white/40 dark:border-white/5 rounded-2xl shadow-xl">
+                 <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-black text-xs uppercase">
+                    {user?.email?.charAt(0)}
+                 </div>
+                 <div className="hidden sm:flex flex-col">
+                    <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-tight">{profile?.full_name || user?.email}</span>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{profile?.role}</span>
+                 </div>
+              </div>
+            </div>
+          </header>
+
+          {activeTab === 'dashboard' && (
+            <div className="space-y-12 animate-in fade-in duration-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                {[
+                  { label: 'Dossiers', value: totalItems, icon: FileText, color: 'from-[#008751] to-emerald-400' },
+                  { label: 'Signalements', value: signalements.length, icon: AlertCircle, color: 'from-blue-600 to-cyan-500' },
+                  { label: 'Utilisateurs', value: allUsers.length, icon: Users, color: 'from-purple-600 to-indigo-500' },
+                  { label: 'Sondages', value: polls.length, icon: Vote, color: 'from-[#EBB700] to-amber-300' }
+                ].map((stat, i) => (
+                  <motion.div 
+                    key={i} 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="card-glass p-8 group overflow-hidden relative"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/10 to-transparent rounded-full -mr-12 -mt-12 blur-xl" />
+                    <div className={cn("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-white mb-6 shadow-xl", stat.color)}>
+                      <stat.icon className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] mb-1">{stat.label}</p>
+                      <p className="text-4xl font-display font-black text-gray-900 dark:text-white tracking-tighter">{stat.value}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
 
         {activeTab === 'dossiers' && (
-          <div className="space-y-8">
-            <div className="bento-card p-6 md:p-8 flex justify-between items-center">
-              <h2 className="text-2xl font-display font-bold dark:text-white">Gestion des Dossiers</h2>
+          <div className="space-y-12 animate-in fade-in duration-700">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="space-y-1">
+                <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Gestion des Dossiers</h2>
+                <div className="h-1 w-12 bg-primary rounded-full" />
+              </div>
               <button 
                 onClick={() => setIsDossierModalOpen(true)}
-                className="btn-primary"
+                className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
+                <Plus className="w-4 h-4" />
                 Nouveau Dossier
               </button>
             </div>
 
-            <div className="bento-card overflow-hidden">
-               <table className="w-full text-left">
+            <div className="card-glass overflow-hidden border-none shadow-2xl">
+              <div className="overflow-x-auto overflow-y-hidden">
+                <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-gray-100 dark:border-white/5">
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Code</th>
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Citoyen</th>
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Service</th>
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Statut</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                    <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Code Suivi</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Citoyen</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Type de Service</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Statut</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em] text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {dossiers.map(d => (
-                      <tr key={d.id} className="border-b border-gray-100 dark:border-white/5">
-                        <td className="px-6 py-4 font-mono text-xs font-bold">{d.tracking_code}</td>
-                        <td className="px-6 py-4 text-sm">{d.submission_data?.firstName} {d.submission_data?.lastName}</td>
-                        <td className="px-6 py-4 text-xs uppercase">{d.tenant_service?.service?.name}</td>
-                        <td className="px-6 py-4">
-                          <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600">
-                            {d.status_id}
-                          </span>
+                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                    {loadingDossiers ? (
+                       [1,2,3].map(i => <tr key={i}><td colSpan={5} className="px-8 py-8 animate-pulse bg-gray-50/20 dark:bg-white/5 h-16" /></tr>)
+                    ) : dossiers.length === 0 ? (
+                       <tr><td colSpan={5} className="px-8 py-20 text-center font-black text-gray-400 uppercase tracking-widest text-xs">Aucun dossier trouvé</td></tr>
+                    ) : dossiers.map((d, i) => (
+                      <motion.tr 
+                        key={d.id}
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-all duration-300 group"
+                      >
+                        <td className="px-8 py-8">
+                          <span className="font-mono text-[10px] font-black text-primary px-3 py-1.5 bg-primary/10 rounded-lg">{d.tracking_code}</span>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <button onClick={() => { setSelectedDossier(d); fetchDossierHistory(d.id); }} className="p-2 border rounded-lg">
+                        <td className="px-8 py-8">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">
+                              {d.submission_data?.firstName} {d.submission_data?.lastName}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-bold tracking-widest">{d.submission_data?.phone}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-8">
+                          <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{d.tenant_service?.service?.name}</span>
+                        </td>
+                        <td className="px-8 py-8">
+                          <div className={cn(
+                            "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest",
+                            d.status_id === 'TERMINÉ' ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" :
+                            d.status_id === 'REJETÉ' ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400" :
+                            "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
+                          )}>
+                            <div className={cn("w-1.5 h-1.5 rounded-full", d.status_id === 'TERMINÉ' ? "bg-emerald-500" : "bg-blue-500")} />
+                            {d.status_id}
+                          </div>
+                        </td>
+                        <td className="px-8 py-8 text-right">
+                          <button 
+                            onClick={() => { setSelectedDossier(d); fetchDossierHistory(d.id); }} 
+                            className="px-4 py-2 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-black text-gray-400 hover:text-primary hover:border-primary/30 uppercase tracking-widest transition-all shadow-sm"
+                          >
                             Détails
                           </button>
                         </td>
-                      </tr>
+                      </motion.tr>
                     ))}
                   </tbody>
                </table>
             </div>
+
+            <div className="p-8 border-t border-gray-100 dark:border-white/5">
+              <Pagination 
+                total={totalItems} 
+                current={currentPage} 
+                pageSize={pageSize}
+                onChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
         {activeTab === 'news' && (
-          <div className="space-y-8">
-            <div className="bento-card p-6 md:p-8 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-display font-bold dark:text-white">Actualités Locales</h2>
-                <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Gérez les articles publiés sur le portail</p>
+          <div className="space-y-12 animate-in fade-in duration-700">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="space-y-1">
+                <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Actualités Locales</h2>
+                <div className="h-1 w-12 bg-primary rounded-full" />
               </div>
-              <button className="btn-primary flex items-center gap-2">
+              <button className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all">
                 <Plus className="w-4 h-4" />
                 Nouvel Article
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {loadingNews ? (
-                [1,2,3].map(i => <div key={i} className="bento-card h-64 animate-pulse bg-gray-50 dark:bg-white/5" />)
+                [1,2,3].map(i => <div key={i} className="card-glass h-80 animate-pulse bg-gray-50/20 dark:bg-white/5" />)
               ) : news.length === 0 ? (
-                <div className="col-span-full bento-card p-12 text-center text-gray-500 font-bold uppercase tracking-widest text-xs">Aucun article publié</div>
-              ) : news.map(item => (
-                <div key={item.id} className="bento-card overflow-hidden flex flex-col group">
-                   <div className="h-40 bg-gray-100 dark:bg-white/5 relative">
+                <div className="col-span-full card-glass p-20 text-center font-black text-gray-400 uppercase tracking-widest text-xs border-none">Aucun article publié</div>
+              ) : news.map((item, i) => (
+                <motion.div 
+                  key={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="card-glass overflow-hidden flex flex-col group border-none shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+                >
+                   <div className="h-48 bg-gray-100 dark:bg-white/5 relative overflow-hidden">
                       {item.image_url ? (
-                        <img src={item.image_url} alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+                        <img src={item.image_url} alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-110 transition-all duration-700" referrerPolicy="no-referrer" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-300">
                           <ImageIcon className="w-12 h-12" />
                         </div>
                       )}
-                      <div className="absolute top-4 left-4">
-                        <span className="px-3 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                      <div className="absolute top-6 left-6">
+                        <span className="px-4 py-1.5 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-2xl border border-white/50 dark:border-white/5">
                           {item.category}
                         </span>
                       </div>
                    </div>
-                   <div className="p-6 space-y-3 flex-grow">
-                      <h3 className="font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight uppercase tracking-tight">{item.title}</h3>
-                      <p className="text-xs text-gray-500 line-clamp-3">{item.excerpt}</p>
+                   <div className="p-8 space-y-4 flex-grow">
+                      <h3 className="text-lg font-display font-black text-gray-900 dark:text-white uppercase tracking-tight line-clamp-2 leading-tight group-hover:text-primary transition-colors">{item.title}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3 leading-relaxed font-bold tracking-tight">{item.excerpt || item.content}</p>
                    </div>
-                   <div className="p-4 border-t border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-white/5">
-                      <span className="text-[10px] font-bold text-gray-400">{formatDate(item.published_at)}</span>
+                   <div className="px-8 py-6 border-t border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/30 dark:bg-white/[0.01]">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">{formatDate(item.published_at)}</span>
                       <div className="flex gap-2">
-                        <button className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-emerald-500 transition-colors">
+                        <button className="w-9 h-9 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl flex items-center justify-center text-gray-400 hover:text-primary hover:border-primary/40 transition-all">
                            <Edit2 className="w-4 h-4" />
                         </button>
-                        <button className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors">
+                        <button className="w-9 h-9 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl flex items-center justify-center text-gray-400 hover:text-rose-500 hover:border-rose-500/40 transition-all">
                            <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                    </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
         )}
 
         {activeTab === 'signalements' && (
-          <div className="space-y-8">
-            <div className="bento-card p-6 md:p-8">
-              <h2 className="text-2xl font-display font-bold dark:text-white">Signalements Citoyens</h2>
-              <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Traiter les problèmes signalés par les résidents</p>
+          <div className="space-y-12 animate-in fade-in duration-700">
+            <div className="space-y-1">
+              <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Signalements Citoyens</h2>
+              <div className="h-1 w-12 bg-primary rounded-full" />
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.3em] mt-3">Traiter les problèmes signalés par les résidents</p>
             </div>
 
-            <div className="bento-card overflow-hidden">
-               <table className="w-full text-left">
+            <div className="card-glass overflow-hidden border-none shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-gray-100 dark:border-white/5">
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Type</th>
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Description</th>
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Statut</th>
-                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                    <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Type</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Description</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Statut</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Date</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em] text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                     {loadingSignalements ? (
-                      [1,2,3].map(i => <tr key={i}><td colSpan={5} className="px-6 py-4 h-12 animate-pulse bg-gray-50/50 dark:bg-white/5" /></tr>)
+                      [1,2,3].map(i => <tr key={i}><td colSpan={5} className="px-8 py-8 h-16 animate-pulse bg-gray-50/20 dark:bg-white/5" /></tr>)
                     ) : signalements.length === 0 ? (
-                      <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-bold uppercase text-xs">Aucun signalement</td></tr>
-                    ) : signalements.map(s => (
-                      <tr key={s.id} className="border-b border-gray-100 dark:border-white/5 group hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4">
-                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">{s.type}</span>
+                      <tr><td colSpan={5} className="px-8 py-20 text-center font-black text-gray-400 uppercase tracking-widest text-xs">Aucun signalement</td></tr>
+                    ) : signalements.map((s, i) => (
+                      <motion.tr 
+                        key={s.id} 
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="group hover:bg-gray-50/50 dark:hover:bg-white/5 transition-all duration-300"
+                      >
+                        <td className="px-8 py-8">
+                          <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20">{s.type}</span>
                         </td>
-                        <td className="px-6 py-4 text-sm max-w-xs truncate">{s.description}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-8 py-8">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight max-w-xs truncate">{s.description}</p>
+                        </td>
+                        <td className="px-8 py-8">
                            <span className={cn(
-                             "px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest",
-                             s.status === 'resolved' ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
+                             "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-sm",
+                             s.status === 'resolved' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-orange-50 text-orange-600 border border-orange-100"
                            )}>
-                              {s.status}
+                              {s.status === 'resolved' ? 'Résolu' : 'En attente'}
                            </span>
                         </td>
-                        <td className="px-6 py-4 text-xs text-gray-500 font-medium">{formatDate(s.created_at)}</td>
-                        <td className="px-6 py-4 text-right">
-                           <button className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-400 hover:text-emerald-500 rounded-lg transition-all">
-                              <ChevronRight className="w-5 h-5" />
-                           </button>
+                        <td className="px-8 py-8">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{formatDate(s.created_at)}</span>
                         </td>
-                      </tr>
+                        <td className="px-8 py-8 text-right">
+                          <button className="px-4 py-2 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-black text-gray-400 hover:text-primary hover:border-primary/30 uppercase tracking-widest transition-all shadow-sm">
+                            Traiter
+                          </button>
+                        </td>
+                      </motion.tr>
                     ))}
                   </tbody>
                </table>
+              </div>
             </div>
           </div>
         )}
@@ -747,50 +866,65 @@ export const AdminPortal: React.FC = () => {
         )}
 
         {/* ... Other tabs ... */}
-        {activeTab === 'settings' && (
-           <div className="space-y-8">
-              <div className="bento-card p-6 md:p-8">
-                <h2 className="text-2xl font-display font-bold dark:text-white">Catalogue des Services</h2>
-                <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Activez ou désactivez les services pour votre mairie</p>
+        {activeTab === 'services' && (
+           <div className="space-y-12 animate-in fade-in duration-700">
+              <div className="space-y-1">
+                <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Catalogue des Services</h2>
+                <div className="h-1 w-16 bg-primary rounded-full" />
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.3em] mt-3">Activez les services disponibles pour votre municipalité</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 {publicServices.map(service => (
-                   <div key={service.id} className="bento-card p-6 flex flex-col justify-between">
-                      <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                 {publicServices.map((service, i) => (
+                   <motion.div 
+                    key={service.id} 
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="card-glass p-8 flex flex-col justify-between group h-full transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 border-none"
+                   >
+                      <div className="space-y-6">
                          <div className="flex justify-between items-start">
-                            <div className="w-10 h-10 bg-gray-100 dark:bg-white/5 rounded-xl flex items-center justify-center">
-                               <FileText className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                            <div className="w-14 h-14 bg-gray-50 dark:bg-white/5 rounded-[20px] flex items-center justify-center text-gray-400 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500">
+                               <FileText className="w-7 h-7" />
                             </div>
                             <button 
                               onClick={() => handleToggleService(service.id, !tenantServices[service.id]?.is_active)}
                               className={cn(
-                                "text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full transition-all",
+                                "text-[9px] font-black uppercase tracking-[0.2em] px-5 py-2.5 rounded-2xl transition-all shadow-sm border",
                                 tenantServices[service.id]?.is_active 
-                                  ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" 
-                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
+                                  : "bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/10 text-gray-400"
                               )}
                             >
                                {tenantServices[service.id]?.is_active ? 'Activé' : 'Désactivé'}
                             </button>
                          </div>
                          <div>
-                            <h3 className="font-bold text-gray-900 dark:text-white uppercase tracking-tight">{service.name}</h3>
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{service.description}</p>
+                            <div className="flex items-center gap-2 mb-2">
+                               <span className="text-[9px] font-black text-primary uppercase tracking-[0.3em]">{service.category}</span>
+                            </div>
+                            <h3 className="text-lg font-display font-black text-gray-900 dark:text-white uppercase tracking-tight leading-tight group-hover:text-primary transition-colors">{service.name}</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 line-clamp-3 leading-relaxed font-bold tracking-tight">{service.description}</p>
                          </div>
                       </div>
-                      <div className="pt-6 border-t border-dotted border-gray-200 dark:border-white/10 mt-6 flex justify-between items-center">
-                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{service.category}</span>
-                         <button className="p-2 text-gray-400 hover:text-emerald-500 transition-colors">
+                      <div className="pt-8 border-t border-gray-100 dark:border-white/5 mt-8 flex justify-between items-center">
+                         <div className="flex -space-x-2">
+                            {[1, 2, 3].map(i => (
+                               <div key={i} className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 bg-gray-100 dark:bg-white/10" />
+                            ))}
+                         </div>
+                         <button className="w-10 h-10 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl flex items-center justify-center text-gray-400 hover:text-primary hover:border-primary/40 transition-all">
                             <Settings className="w-4 h-4" />
                          </button>
                       </div>
-                   </div>
+                   </motion.div>
                  ))}
               </div>
            </div>
         )}
       </main>
+    </div>
 
       <AnimatePresence>
         {feedback && (

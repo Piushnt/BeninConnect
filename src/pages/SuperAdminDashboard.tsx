@@ -213,76 +213,94 @@ export const SuperAdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] transition-colors duration-300 relative overflow-hidden">
-      {/* Background Glow Effects */}
-      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] transition-colors duration-300 relative overflow-hidden font-sans">
+      {/* Background Glow Effects (Neo-Glassmorphism) */}
+      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-secondary/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute top-[20%] left-[10%] w-[30%] h-[30%] bg-accent/5 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="flex relative z-10">
-        {/* Sidebar */}
-        <aside className="w-64 h-screen sticky top-0 bg-white/60 dark:bg-[#131B2B]/60 backdrop-blur-xl border-r border-gray-200 dark:border-white/5 p-6 hidden lg:flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] dark:shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 rounded-xl flex items-center justify-center text-white dark:text-gray-900 shadow-lg">
-              <Shield className="w-5 h-5" />
+        {/* Sidebar - Floating Glass Effect */}
+        <aside className="w-72 h-[calc(100vh-48px)] sticky top-6 ml-6 my-6 bg-white/40 dark:bg-[#131B2B]/40 backdrop-blur-2xl border border-white/40 dark:border-white/5 p-8 hidden lg:flex flex-col shadow-2xl rounded-[40px] overflow-hidden">
+          <div className="flex items-center gap-4 mb-12">
+            <div className="w-12 h-12 bg-gradient-to-br from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 rounded-2xl flex items-center justify-center text-white dark:text-gray-900 shadow-xl group-hover:rotate-6 transition-transform">
+              <Shield className="w-6 h-6" />
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-tight">SaaS Console</span>
-              <span className="text-sm font-display font-bold text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Super Admin</span>
+              <span className="text-[10px] font-black text-primary dark:text-emerald-400 uppercase tracking-[0.3em] leading-tight mb-1">Bénin Connect</span>
+              <span className="text-lg font-display font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Console</span>
             </div>
           </div>
 
-          <nav className="space-y-2 flex-grow">
+          <nav className="space-y-3 flex-grow">
             {[
-              { id: 'overview', label: 'Vue d\'ensemble', icon: LayoutDashboard },
-              { id: 'tenants', label: 'Gestion Mairies', icon: Globe },
-              { id: 'locations', label: 'Points d\'Intérêt', icon: MapPin },
-              { id: 'users', label: 'Utilisateurs', icon: Users },
-              { id: 'user-creation', label: 'Créer un Acteur', icon: Plus },
-              { id: 'logs', label: 'Logs Système', icon: Activity },
-              { id: 'config', label: 'Configuration Cloud', icon: Settings },
+              { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+              { id: 'tenants', label: 'Town Halls', icon: Globe },
+              { id: 'locations', label: 'Map POIs', icon: MapPin },
+              { id: 'users', label: 'Accounts', icon: Users },
+              { id: 'user-creation', label: 'Management', icon: Plus },
+              { id: 'logs', label: 'System Logs', icon: Activity },
+              { id: 'config', label: 'Cloud API', icon: Settings },
             ].map((item, i) => (
               <button 
                 key={i}
                 onClick={() => setActiveTab(item.id)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                  "w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden group",
                   activeTab === item.id 
-                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-lg shadow-gray-900/20 dark:shadow-white/10" 
-                    : "text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-xl" 
+                    : "text-gray-500 hover:bg-white/50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                 )}
               >
-                <item.icon className="w-4 h-4" />
-                {item.label}
+                {activeTab === item.id && (
+                  <motion.div layoutId="nav-glow" className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 blur-xl" />
+                )}
+                <item.icon className={cn("w-5 h-5 relative z-10 transition-transform group-hover:scale-110", activeTab === item.id ? "text-secondary dark:text-primary" : "")} />
+                <span className="relative z-10">{item.label}</span>
               </button>
             ))}
           </nav>
 
-          <div className="pt-4 border-t border-gray-200 dark:border-white/5">
-            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl space-y-2 border border-gray-100 dark:border-white/5">
-              <div className="flex items-center gap-2">
-                <Database className="w-3 h-3 text-emerald-500" />
-                <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">Version Cloud</span>
+          <div className="pt-6 border-t border-gray-100 dark:border-white/10 mt-auto">
+            <div className="p-4 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Environment</span>
               </div>
-              <div className="text-[10px] font-mono font-bold text-gray-900 dark:text-white">v2.5.0-stable</div>
+              <div className="text-[11px] font-mono font-bold text-gray-900 dark:text-white uppercase">Cloud-BJ-V2.5</div>
             </div>
           </div>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-grow p-6 md:p-8 max-w-[1400px] mx-auto">
-          {/* Header */}
-          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 bento-card p-6 md:p-8">
+        {/* Main Content Area */}
+        <main className="flex-grow p-6 lg:p-12 max-w-[1500px] mx-auto space-y-12">
+          {/* Top Navigation / Breadcrumbs Equivalent */}
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-4">
             <div className="space-y-2">
-              <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white tracking-tight">Console de Gestion Globale</h1>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-widest">Contrôle centralisé de toutes les instances MairieConnect.</p>
+              <h1 className="text-4xl md:text-5xl font-display font-black text-gray-900 dark:text-white tracking-tighter uppercase">
+                {activeTab === 'overview' ? 'Global Command' : activeTab.replace('-', ' ')}
+              </h1>
+              <div className="flex items-center gap-4">
+                <div className="h-1.5 w-16 bg-primary rounded-full" />
+                <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">Infrastructure & Access Control</p>
+              </div>
             </div>
-            <button 
-              onClick={() => setIsAddingTenant(true)}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Déployer une Mairie
-            </button>
+            
+            <div className="flex items-center gap-4">
+              <button className="btn-glass flex items-center gap-3">
+                <Activity className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-black uppercase tracking-widest">System OK</span>
+              </button>
+              <button 
+                onClick={() => setIsAddingTenant(true)}
+                className="btn-primary group"
+              >
+                <div className="flex items-center gap-3">
+                  <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
+                  <span>Deploy New Instance</span>
+                </div>
+              </button>
+            </div>
           </header>
 
           {/* Stats Grid */}
@@ -380,121 +398,151 @@ export const SuperAdminDashboard: React.FC = () => {
           )}
 
           {activeTab === 'overview' && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="space-y-12 animate-in fade-in duration-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {[
-                  { label: 'Mairies Actives', value: stats.totalTenants, icon: Globe, color: 'from-blue-500 to-cyan-400' },
-                  { label: 'Utilisateurs Cloud', value: stats.activeUsers, icon: Users, color: 'from-purple-500 to-indigo-400' },
-                  { label: 'Dossiers Traités', value: stats.totalDossiers, icon: CheckCircle2, color: 'from-emerald-500 to-teal-400' },
-                  { label: 'Santé Système', value: stats.systemHealth, icon: Activity, color: 'from-amber-500 to-orange-400' },
+                  { label: 'Mairies Actives', value: stats.totalTenants, icon: Globe, color: 'from-blue-600 to-cyan-500' },
+                  { label: 'Utilisateurs Cloud', value: stats.activeUsers, icon: Users, color: 'from-[#008751] to-emerald-400' },
+                  { label: 'Dossiers Traités', value: stats.totalDossiers, icon: CheckCircle2, color: 'from-[#EBB700] to-amber-300' },
+                  { label: 'Santé Système', value: stats.systemHealth, icon: Activity, color: 'from-rose-600 to-pink-500' },
                 ].map((stat, i) => (
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="bento-card p-6 group"
+                    initial={{ opacity: 0, scale: 0.95, y: 30 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: i * 0.1, type: 'spring', damping: 20 }}
+                    className="card-glass p-8 group relative overflow-hidden"
                   >
-                    <div className="glow-effect" />
-                    <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${stat.color} text-white flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
-                      <stat.icon className="w-6 h-6" />
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/10 to-transparent rounded-full -mr-16 -mt-16 blur-2xl group-hover:blur-3xl transition-all" />
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.color} text-white flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}>
+                      <stat.icon className="w-7 h-7" />
                     </div>
-                    <div className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-1">{stat.value}</div>
-                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{stat.label}</div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-4xl font-display font-black text-gray-900 dark:text-white tracking-tighter">
+                        {stat.value}
+                      </span>
+                      <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
+                        {stat.label}
+                      </span>
+                    </div>
                   </motion.div>
                 ))}
               </div>
-            </>
+            </div>
           )}
 
           {/* Tenants Table */}
           {['overview', 'tenants'].includes(activeTab) && (
-              <div className="bento-card overflow-hidden">
-                <div className="p-6 md:p-8 border-b border-gray-100 dark:border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-                  <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white">Instances Déployées</h2>
-                  <div className="relative w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input 
-                      type="text"
-                      placeholder="Rechercher..."
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-white/5 border border-transparent focus:border-gray-200 dark:focus:border-white/10 rounded-xl text-xs font-medium outline-none dark:text-white transition-all"
-                    />
-                  </div>
+            <div className="card-glass overflow-hidden border-none shadow-2xl animate-in slide-in-from-bottom-8 duration-700">
+              <div className="p-10 border-b border-gray-100 dark:border-white/5 flex flex-col lg:flex-row justify-between items-center gap-8">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tight">Active Town Halls</h2>
+                  <div className="h-1 w-12 bg-primary rounded-full" />
                 </div>
+                <div className="relative w-full lg:w-96 group">
+                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type="text"
+                    placeholder="Filter instances..."
+                    className="w-full h-full pl-16 pr-6 py-5 bg-gray-50 shadow-inner dark:bg-white/5 border border-transparent focus:border-primary/20 rounded-[24px] text-xs font-black uppercase tracking-[0.2em] outline-none dark:text-white transition-all"
+                  />
+                </div>
+              </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-gray-50/50 dark:bg-white/5">
-                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mairie / Commune</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Département</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Statut</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Modules</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                      {tenants.map((t, i) => {
-                        const hasPolls = t.tenant_features?.some((f: any) => f.features?.key === 'citizen_voice' && f.is_enabled);
-                        
-                        return (
-                        <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-4">
-                              <img src={t.logo_url} className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-white/10" alt={t.name} />
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold text-gray-900 dark:text-white">{t.name}</span>
-                                <span className="text-[10px] text-gray-500 font-medium">{t.slug}.mairieconnect.bj</span>
+              <div className="overflow-x-auto overflow-y-hidden">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50/50 dark:bg-white/[0.02]">
+                      <th className="px-10 py-8 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Municipality</th>
+                      <th className="px-10 py-8 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Location</th>
+                      <th className="px-10 py-8 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">System Status</th>
+                      <th className="px-10 py-8 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Service Modules</th>
+                      <th className="px-10 py-8 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em] text-right">Control</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                    {tenants.map((t, i) => {
+                      const hasPolls = t.tenant_features?.some((f: any) => f.features?.key === 'citizen_voice' && f.is_enabled);
+                      return (
+                      <motion.tr 
+                        key={t.id}
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-all duration-500 group"
+                      >
+                        <td className="px-10 py-10">
+                          <div className="flex items-center gap-6">
+                            <div className="relative">
+                              <div className="absolute inset-0 bg-primary/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <img src={t.logo_url} className="w-[60px] h-[60px] rounded-[22px] object-cover bg-white dark:bg-gray-800 shadow-xl border border-gray-100 dark:border-white/10 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500 relative z-10" alt={t.name} />
+                              {t.is_active && <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white dark:border-gray-900 rounded-full z-20" />}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[15px] font-black text-gray-900 dark:text-white uppercase tracking-tight mb-1">{t.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Globe className="w-3 h-3 text-primary" />
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{t.slug}.mairieconnect.bj</span>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{t.departments?.name}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <div className={cn("w-2 h-2 rounded-full", t.is_active ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500")} />
-                              <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
-                                {t.is_active ? 'Actif' : 'Inactif'}
-                              </span>
+                          </div>
+                        </td>
+                        <td className="px-10 py-10">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-400">
+                               <MapPin className="w-5 h-5" />
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <button 
+                            <span className="text-xs font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">{t.departments?.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-10 py-10">
+                          <div className={cn(
+                             "inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl border transition-all",
+                             t.is_active 
+                                ? "bg-emerald-50/50 dark:bg-emerald-500/10 border-emerald-100/50 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
+                                : "bg-rose-50/50 dark:bg-rose-500/10 border-rose-100/50 dark:border-rose-500/20 text-rose-600 dark:text-rose-400"
+                          )}>
+                            <div className={cn("w-2 h-2 rounded-full", t.is_active ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]" : "bg-red-500")} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t.is_active ? 'Active' : 'Offline'}</span>
+                          </div>
+                        </td>
+                        <td className="px-10 py-10">
+                          <div className="flex flex-wrap gap-2">
+                             <button 
                                 onClick={() => toggleFeature(t.id, 'citizen_voice', hasPolls)}
                                 className={cn(
-                                  "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                                  "px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-[0.1em] transition-all flex items-center gap-3 shadow-inner border",
                                   hasPolls 
-                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
-                                    : "bg-gray-50 dark:bg-white/5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20" 
+                                    : "bg-gray-100 dark:bg-white/5 text-gray-400 border-gray-200 dark:border-white/5"
                                 )}
                               >
                                 <Vote className="w-3.5 h-3.5" />
-                                Sondages
+                                Voice
+                                {hasPolls && <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />}
                               </button>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2 justify-end">
-                              <button 
-                                onClick={() => setEditingTenant(t)}
-                                className="p-2 text-gray-400 hover:text-primary dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-all"
-                              >
-                                <Settings className="w-4 h-4" />
-                              </button>
-                              <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </td>
+                        <td className="px-10 py-10">
+                          <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0">
+                            <button 
+                               onClick={() => setEditingTenant(t)}
+                               className="p-4 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl text-gray-400 hover:text-primary hover:border-primary/30 transition-all shadow-xl hover:-translate-y-1"
+                            >
+                              <Settings className="w-5 h-5" />
+                            </button>
+                            <button className="p-4 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl text-gray-400 hover:text-rose-500 hover:border-rose-500/30 transition-all shadow-xl hover:-translate-y-1">
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    )})}
+                  </tbody>
+                </table>
+              </div>
 
+              <div className="p-10 border-t border-gray-100 dark:border-white/5">
                 <Pagination 
                   total={totalItems} 
                   current={currentPage} 
@@ -503,6 +551,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   onPageSizeChange={setPageSize}
                 />
               </div>
+            </div>
           )}
 
           {activeTab === 'locations' && (

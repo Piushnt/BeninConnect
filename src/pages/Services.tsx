@@ -7,6 +7,8 @@ import { TenantService } from '../types';
 import { cn } from '../lib/utils';
 import { useSearchParams, Link } from 'react-router-dom';
 
+import { ServiceCard } from '../components/ServiceCard';
+
 export const Services: React.FC = () => {
   const { tenant } = useTenant();
   const [searchParams] = useSearchParams();
@@ -51,125 +53,127 @@ export const Services: React.FC = () => {
   });
 
   return (
-    <div className="py-12 bg-gray-50 dark:bg-gray-950 min-h-screen transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center space-y-4 mb-12">
-          <div className="text-[10px] font-black text-[#008751] dark:text-green-400 uppercase tracking-[0.3em]">Services Publics</div>
-          <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Prestations de la Mairie</h1>
-          <div className="w-24 h-1.5 bg-[#EBB700] mx-auto" />
-          <p className="text-gray-500 dark:text-gray-400 max-w-2xl mx-auto font-medium">
-            Accédez à toutes les prestations de la mairie de {tenant?.name}. 
-            Consultez les tarifs, les pièces à fournir et lancez vos démarches en ligne.
-          </p>
-        </div>
+    <div className="py-20 lg:py-32 bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] min-h-screen transition-colors duration-300 relative overflow-hidden">
+      {/* Background Decorative Elements */}
+      <div className="absolute top-[10%] right-[-5%] w-[40%] h-[40%] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[10%] left-[-5%] w-[40%] h-[40%] bg-secondary/10 blur-[120px] rounded-full pointer-events-none" />
 
-        {/* Search & Filter */}
-        <div className="max-w-4xl mx-auto mb-12 space-y-6">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input 
-              type="text"
-              placeholder="Rechercher un service (ex: Acte de naissance, Permis...)"
-              className="w-full pl-12 pr-4 py-4 bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 focus:ring-2 focus:ring-[#008751]/20 outline-none transition-all font-bold text-xs dark:text-white"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <header className="text-center space-y-6 mb-20 lg:mb-32">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-[10px] font-black text-primary dark:text-emerald-400 uppercase tracking-[0.4em] mb-4"
+          >
+            Catalogue des E-Services
+          </motion.div>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-5xl lg:text-7xl font-display font-black text-gray-900 dark:text-white uppercase tracking-tighter"
+          >
+            Prestations de la Mairie
+          </motion.h1>
+          <motion.div 
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+            className="w-32 h-2 bg-secondary mx-auto rounded-full" 
+          />
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-gray-500 dark:text-gray-400 max-w-2xl mx-auto font-medium text-lg leading-relaxed"
+          >
+            Simplifiez vos démarches administratives auprès de la mairie de <span className="font-bold text-gray-900 dark:text-white uppercase px-1">{tenant?.name}</span>. 
+            Transparence, célérité et sécurité.
+          </motion.p>
+        </header>
 
-          <div className="flex flex-wrap justify-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Catégorie:</span>
+        {/* Search & Filter - Floating Bar */}
+        <div className="max-w-5xl mx-auto mb-20 space-y-8">
+          <div className="card-glass p-2 flex flex-col md:flex-row items-center gap-2 group">
+            <div className="relative flex-grow w-full">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-6 group-focus-within:text-primary transition-colors" />
+              <input 
+                type="text"
+                placeholder="Rechercher une prestation (ex: Acte de naissance, Mariage, Permis...)"
+                className="w-full pl-16 pr-6 py-6 bg-transparent rounded-3xl text-sm font-bold placeholder:text-gray-400 outline-none dark:text-white"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex w-full md:w-auto p-2 gap-2">
               <select 
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-[10px] font-black uppercase tracking-widest outline-none dark:text-white"
+                className="flex-grow md:w-48 px-6 py-4 bg-gray-100 dark:bg-white/5 dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none hover:bg-white transition-all cursor-pointer border border-transparent focus:border-primary/30"
               >
-                <option value="all">Toutes</option>
+                <option value="all">Catégories</option>
                 <option value="État Civil">État Civil</option>
                 <option value="Urbanisme">Urbanisme</option>
                 <option value="Fiscalité">Fiscalité</option>
                 <option value="Administratif">Administratif</option>
               </select>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Statut:</span>
               <select 
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-4 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-[10px] font-black uppercase tracking-widest outline-none dark:text-white"
+                className="flex-grow md:w-48 px-6 py-4 bg-gray-100 dark:bg-white/5 dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none hover:bg-white transition-all cursor-pointer border border-transparent focus:border-primary/30"
               >
-                <option value="all">Tous les statuts</option>
-                <option value="online">En ligne</option>
-                <option value="partial">Partiellement en ligne</option>
-                <option value="physical">En présentiel</option>
+                <option value="all">Digitalisation</option>
+                <option value="online">100% Digital</option>
+                <option value="partial">Mixte</option>
+                <option value="physical">Présentiel</option>
               </select>
             </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[1,2,3].map(i => <div key={i} className="h-64 bg-gray-200 dark:bg-gray-800 rounded-[40px] animate-pulse" />)}
+          <div className="space-y-8">
+            {[1,2,3].map(i => <div key={i} className="h-48 bg-gray-200 dark:bg-gray-800 rounded-[32px] animate-pulse" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredServices.map((ts, i) => (
-              <motion.div
-                key={ts.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-white dark:bg-gray-900 p-8 rounded-[40px] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl transition-all group cursor-pointer"
-                onClick={() => setSelectedService(ts)}
-              >
-                <div className="flex justify-between items-start mb-8">
-                  <div className="w-14 h-14 bg-green-50 dark:bg-green-900/20 rounded-2xl flex items-center justify-center text-[#008751] dark:text-green-400">
-                    <FileText className="w-7 h-7" />
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 tracking-widest uppercase">{ts.service?.category}</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn(
-                        "w-1.5 h-1.5 rounded-full",
-                        ts.service?.global_status === 'online' ? "bg-green-500" :
-                        ts.service?.global_status === 'partial' ? "bg-yellow-500" : "bg-blue-500"
-                      )} />
-                      <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">
-                        {ts.service?.global_status === 'online' ? 'En ligne' :
-                         ts.service?.global_status === 'partial' ? 'Partiel' : 'Présentiel'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-4 uppercase tracking-tight leading-tight group-hover:text-[#008751] dark:group-hover:text-green-400 transition-colors">
-                  {ts.service?.name}
-                </h3>
-                
-                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-8 line-clamp-3 font-medium">
-                  {ts.service?.description}
-                </p>
-
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                    <Clock className="w-4 h-4" />
-                    Délai variable
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                    <Coins className="w-4 h-4" />
-                    {(ts.custom_price || ts.service?.base_price || 0) > 0 ? `${ts.custom_price || ts.service?.base_price} FCFA` : 'GRATUIT'}
-                  </div>
-                </div>
-
-                <button className="w-full py-4 bg-gray-50 dark:bg-gray-800 text-[#008751] dark:text-green-400 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 group-hover:bg-[#008751] group-hover:text-white transition-all active:scale-95">
-                  Détails & Procédure
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </motion.div>
-            ))}
+          <div className="space-y-8 lg:space-y-12 mb-20 lg:mb-32">
+            {filteredServices.length > 0 ? (
+              filteredServices.map((ts, i) => (
+                <ServiceCard 
+                  key={ts.id}
+                  name={ts.service?.name || ''}
+                  cost={ts.custom_price || ts.service?.base_price || 0}
+                  delay={ts.custom_procedure ? "Voir détails" : (ts.service?.procedure_steps ? "Variable" : "48h")}
+                  requiredDocuments={ts.custom_documents || ts.service?.required_documents || []}
+                  physicalPresenceRequired={ts.service?.global_status !== 'online'}
+                  onAction={() => setSelectedService(ts)}
+                  actionLabel={ts.service?.global_status === 'online' ? "Lancer le service" : "Prise de RDV"}
+                  icon={ts.service?.category === 'État Civil' ? <FileText className="w-6 h-6" /> : <Info className="w-6 h-6" />}
+                />
+              ))
+            ) : (
+              <div className="text-center py-20 card-glass">
+                <p className="text-gray-400 font-bold uppercase tracking-widest">Aucun service ne correspond à votre recherche.</p>
+              </div>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Footer Info */}
+      <div className="bg-gray-900 dark:bg-black py-20 text-white relative">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-12 text-center md:text-left">
+          <div className="space-y-2">
+            <h3 className="text-2xl font-black uppercase tracking-tighter">Besoin d'aide ?</h3>
+            <p className="opacity-60 text-sm font-medium">Nos agents vous accompagnent dans toutes vos démarches administratives.</p>
+          </div>
+          <div className="flex gap-4">
+             <Link to={`/${tenant?.slug}/rendez-vous`} className="btn-primary bg-white text-black">Contact Mairie</Link>
+             <Link to={`/${tenant?.slug}/suivi-dossier`} className="btn-primary border-white border text-white bg-transparent">Suivi Dossier</Link>
+          </div>
+        </div>
       </div>
 
       {/* Service Detail Modal */}
