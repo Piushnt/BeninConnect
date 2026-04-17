@@ -23,7 +23,7 @@ RETURNS BOOLEAN AS $$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
-        AND (role = 'super_admin' OR (role IN ('admin', 'ca_admin') AND tenant_id = t_id))
+        AND (role IN ('super_admin', 'super-admin') OR (role IN ('admin', 'ca_admin') AND tenant_id = t_id))
     );
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
@@ -32,7 +32,7 @@ RETURNS BOOLEAN AS $$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
-        AND (role = 'super_admin' OR (tenant_id = t_id AND role IN ('admin', 'agent', 'ca_admin')))
+        AND (role IN ('super_admin', 'super-admin') OR (tenant_id = t_id AND role IN ('admin', 'agent', 'ca_admin')))
     );
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 

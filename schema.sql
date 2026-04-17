@@ -160,7 +160,7 @@ CREATE TABLE user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id), -- NULLABLE pour citoyens nationaux (Fix 500)
     arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL, -- Rattachment local
-    role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'agent', 'citizen', 'ca_admin')), -- ca_admin = Chef Arrondissement
+    role TEXT NOT NULL CHECK (role IN ('super_admin', 'super-admin', 'admin', 'agent', 'citizen', 'ca_admin')), -- ca_admin = Chef Arrondissement
     full_name TEXT, -- Alignement React (Fix 500)
     avatar_url TEXT, -- Alignement React (Fix 500)
     signature_url TEXT, -- Pour stocker le tracé de signature de l'admin
@@ -193,7 +193,7 @@ RETURNS BOOLEAN AS $$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
-        AND (role = 'super_admin' OR (role IN ('admin', 'ca_admin') AND tenant_id = t_id))
+        AND (role IN ('super_admin', 'super-admin') OR (role IN ('admin', 'ca_admin') AND tenant_id = t_id))
     );
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
@@ -202,7 +202,7 @@ RETURNS BOOLEAN AS $$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
-        AND (role = 'super_admin' OR (tenant_id = t_id AND role IN ('admin', 'agent', 'ca_admin')))
+        AND (role IN ('super_admin', 'super-admin') OR (tenant_id = t_id AND role IN ('admin', 'agent', 'ca_admin')))
     );
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 

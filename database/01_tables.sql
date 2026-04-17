@@ -159,7 +159,7 @@ CREATE TABLE user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id),
     arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
-    role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'agent', 'citizen', 'ca_admin')),
+    role TEXT NOT NULL CHECK (role IN ('super_admin', 'super-admin', 'admin', 'agent', 'citizen', 'ca_admin')),
     full_name TEXT,
     avatar_url TEXT,
     signature_url TEXT,

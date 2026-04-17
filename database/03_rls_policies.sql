@@ -16,12 +16,12 @@ CREATE POLICY "Profiles are viewable by owner" ON user_profiles FOR SELECT USING
 CREATE POLICY "Staff can view profiles for their tenant" ON user_profiles FOR SELECT USING (
     EXISTS (
         SELECT 1 FROM user_profiles
-        WHERE id = auth.uid() AND (role = 'super_admin' OR (role IN ('admin', 'agent', 'ca_admin') AND tenant_id = user_profiles.tenant_id))
+        WHERE id = auth.uid() AND (role IN ('super_admin', 'super-admin') OR (role IN ('admin', 'agent', 'ca_admin') AND tenant_id = user_profiles.tenant_id))
     )
 );
 
 CREATE POLICY "Super admins can manage everything" ON user_profiles FOR ALL USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'super_admin')
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('super_admin', 'super-admin'))
 );
 
 CREATE POLICY "Self-registration" ON user_profiles FOR INSERT WITH CHECK (auth.uid() = id);
