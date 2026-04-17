@@ -97,10 +97,68 @@ CREATE TABLE tenant_features (
     PRIMARY KEY (tenant_id, feature_id)
 );
 
+-- ===============================================================
+-- 2. UNITÉS STRUCTURELLES & ÉLUS
+-- ===============================================================
+
+CREATE TABLE council_roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    rank INTEGER DEFAULT 10
+);
+
+CREATE TABLE arrondissements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    chef_arrondissement TEXT,
+    population INTEGER,
+    villages TEXT[],
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE arrondissement_addresses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    arrondissement_id UUID NOT NULL REFERENCES arrondissements(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    value TEXT NOT NULL,
+    latitude DECIMAL(9,6),
+    longitude DECIMAL(9,6),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE council_members (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    role_id UUID REFERENCES council_roles(id),
+    full_name TEXT NOT NULL,
+    bio TEXT,
+    photo_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE locations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    latitude DECIMAL(9,6),
+    longitude DECIMAL(9,6),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ===============================================================
+-- 3. UTILISATEURS & IDENTITÉS
+-- ===============================================================
+
 CREATE TABLE user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id),
-    arrondissement_id UUID,
+    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
     role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'agent', 'citizen', 'ca_admin')),
     full_name TEXT,
     avatar_url TEXT,
@@ -306,7 +364,7 @@ CREATE TABLE push_subscriptions (
 
 CREATE TABLE user_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     preferences JSONB DEFAULT '{"news": true, "alerts": true, "events": true, "services": true}',
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -455,56 +513,6 @@ CREATE TABLE transport_registrations (
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'under_review', 'approved', 'rejected', 'active', 'expired')),
     license_url TEXT,
     expiry_date DATE,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE council_roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
-    rank INTEGER DEFAULT 10
-);
-
-CREATE TABLE council_members (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    role_id UUID REFERENCES council_roles(id),
-    full_name TEXT NOT NULL,
-    bio TEXT,
-    photo_url TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE arrondissements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    chef_arrondissement TEXT,
-    population INTEGER,
-    villages TEXT[],
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE arrondissement_addresses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-    arrondissement_id UUID NOT NULL REFERENCES arrondissements(id) ON DELETE CASCADE,
-    label TEXT NOT NULL,
-    value TEXT NOT NULL,
-    latitude DECIMAL(9,6),
-    longitude DECIMAL(9,6),
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE locations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    description TEXT,
-    image_url TEXT,
-    latitude DECIMAL(9,6),
-    longitude DECIMAL(9,6),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 

@@ -94,6 +94,64 @@ CREATE TABLE tenant_features (
 );
 
 -- ===============================================================
+-- 1.5 UNITÉS STRUCTURELLES & ÉLUS
+-- ===============================================================
+
+-- Arrondissements
+CREATE TABLE arrondissements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    chef_arrondissement TEXT,
+    population INTEGER,
+    villages TEXT[],
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Adresses des arrondissements
+CREATE TABLE arrondissement_addresses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    arrondissement_id UUID NOT NULL REFERENCES arrondissements(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    value TEXT NOT NULL,
+    latitude DECIMAL(9,6),
+    longitude DECIMAL(9,6),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Conseil Municipal
+CREATE TABLE council_roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    rank INTEGER DEFAULT 10 -- Pour le tri par importance
+);
+
+CREATE TABLE council_members (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    role_id UUID REFERENCES council_roles(id),
+    full_name TEXT NOT NULL,
+    bio TEXT,
+    photo_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Points d'Intérêt (POI)
+CREATE TABLE locations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL, -- 'mairie', 'ecole', 'sante', 'marche'
+    description TEXT,
+    image_url TEXT,
+    latitude DECIMAL(9,6),
+    longitude DECIMAL(9,6),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ===============================================================
 -- 2. IDENTITÉ & PROFILS (Fix 403, 500)
 -- ===============================================================
 
@@ -101,7 +159,7 @@ CREATE TABLE tenant_features (
 CREATE TABLE user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id), -- NULLABLE pour citoyens nationaux (Fix 500)
-    arrondissement_id UUID, -- Rattachment local
+    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL, -- Rattachment local
     role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'agent', 'citizen', 'ca_admin')), -- ca_admin = Chef Arrondissement
     full_name TEXT, -- Alignement React (Fix 500)
     avatar_url TEXT, -- Alignement React (Fix 500)
@@ -397,6 +455,7 @@ CREATE TABLE user_subscriptions (
 CREATE TABLE signalements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
     citizen_id UUID REFERENCES user_profiles(id),
     category TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -548,57 +607,6 @@ CREATE TABLE transport_registrations (
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'under_review', 'approved', 'rejected', 'active', 'expired')),
     license_url TEXT,
     expiry_date DATE,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Conseil Municipal
-CREATE TABLE council_roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
-    rank INTEGER DEFAULT 10 -- Pour le tri par importance
-);
-
-CREATE TABLE council_members (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    role_id UUID REFERENCES council_roles(id),
-    full_name TEXT NOT NULL,
-    bio TEXT,
-    photo_url TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Arrondissements
-CREATE TABLE arrondissements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    chef_arrondissement TEXT,
-    population INTEGER,
-    villages TEXT[],
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Adresses des arrondissements
-CREATE TABLE arrondissement_addresses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-    arrondissement_id UUID NOT NULL REFERENCES arrondissements(id) ON DELETE CASCADE,
-    label TEXT NOT NULL,
-    value TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Points d'Intérêt (POI)
-CREATE TABLE locations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL, -- 'mairie', 'ecole', 'sante', 'marche'
-    description TEXT,
-    image_url TEXT,
-    latitude DECIMAL(9,6),
-    longitude DECIMAL(9,6),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
