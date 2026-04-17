@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
   Globe, 
@@ -19,12 +20,16 @@ import {
   MapPin,
   ImageIcon,
   Trash2,
-  Vote
+  Vote,
+  ExternalLink,
+  ShieldAlert,
+  Building2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Pagination } from '../components/Pagination';
 
 export const SuperAdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
@@ -306,6 +311,30 @@ export const SuperAdminDashboard: React.FC = () => {
                 <span className="relative z-10">{item.label}</span>
               </button>
             ))}
+
+            <div className="pt-8 space-y-3">
+              <h4 className="px-5 text-[8px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">Portails Externes</h4>
+              <button 
+                onClick={() => navigate('/ministerial-dashboard')}
+                className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:bg-white/50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-all group"
+              >
+                <ShieldAlert className="w-5 h-5 transition-transform group-hover:scale-110" />
+                <span>Ministère</span>
+                <ExternalLink className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100" />
+              </button>
+              <button 
+                onClick={() => {
+                  const firstTenant = tenants[0];
+                  if (firstTenant) navigate(`/${firstTenant.slug}/admin-portal`);
+                  else alert("Aucune mairie active pour la redirection.");
+                }}
+                className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:bg-white/50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-all group"
+              >
+                <Building2 className="w-5 h-5 transition-transform group-hover:scale-110" />
+                <span>Mairie Admin</span>
+                <ExternalLink className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100" />
+              </button>
+            </div>
           </nav>
 
           <div className="pt-6 border-t border-gray-100 dark:border-white/10 mt-auto">
