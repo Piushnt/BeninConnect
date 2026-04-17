@@ -115,6 +115,8 @@ export interface FileStorage {
   original_name: string;
   mime_type: string | null;
   size_bytes: number | null;
+  storage_path?: string;
+  public_url?: string;
   current_version_id: string | null;
   created_at: string;
 }

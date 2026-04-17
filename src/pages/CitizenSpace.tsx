@@ -18,7 +18,15 @@ import {
   Store,
   Building2,
   ShieldCheck,
-  MapPin
+  MapPin,
+  Upload,
+  Plus,
+  RefreshCcw,
+  LogOut,
+  Camera,
+  Trash2,
+  Save,
+  Pencil
 } from 'lucide-react';
 import { Dossier, CitizenDocument } from '../types';
 import { cn } from '../lib/utils';
@@ -32,13 +40,44 @@ export const CitizenSpace: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'dossiers' | 'documents' | 'payments' | 'services' | 'profile'>('dossiers');
   const [search, setSearch] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState('identity');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [citizenProfile, setCitizenProfile] = useState<any>(null);
+  const [profileForm, setProfileForm] = useState({
+    full_name: '',
+    phone: '',
+    address: '',
+    npi: ''
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
       fetchData();
+      fetchCitizenProfile();
     }
   }, [user]);
+
+  const fetchCitizenProfile = async () => {
+    const { data } = await supabase
+      .from('citizen_profiles')
+      .select('*')
+      .eq('id', user?.id)
+      .single();
+    
+    if (data) {
+      setCitizenProfile(data);
+      setProfileForm({
+        full_name: profile?.full_name || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        npi: data.npi || ''
+      });
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -71,6 +110,99 @@ export const CitizenSpace: React.FC = () => {
       console.error('Error fetching citizen data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      // Update basic profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update({ full_name: profileForm.full_name })
+        .eq('id', user?.id);
+      
+      if (profileError) throw profileError;
+
+      // Update citizen specific profile
+      const { error: citizenError } = await supabase
+        .from('citizen_profiles')
+        .upsert({
+          id: user?.id,
+          phone: profileForm.phone,
+          address: profileForm.address,
+          npi: profileForm.npi
+        });
+      
+      if (citizenError) throw citizenError;
+
+      alert('Profil mis à jour avec succès !');
+      setIsEditingProfile(false);
+      fetchData();
+      fetchCitizenProfile();
+    } catch (err: any) {
+      alert('Erreur: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile) return;
+
+    try {
+      setIsUploading(true);
+      // 1. Upload to Storage
+      const fileExt = uploadFile.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `citizen-docs/${user?.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('public')
+        .upload(filePath, uploadFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('public')
+        .getPublicUrl(filePath);
+
+      // 2. Create entry in file_storage
+      const { data: storageData, error: storageError } = await supabase
+        .from('file_storage')
+        .insert({
+          original_name: uploadFile.name,
+          mime_type: uploadFile.type,
+          size_bytes: uploadFile.size,
+          storage_path: filePath,
+          public_url: publicUrl
+        })
+        .select()
+        .single();
+
+      if (storageError) throw storageError;
+
+      // 3. Link to citizen_documents
+      const { error: linkError } = await supabase
+        .from('citizen_documents')
+        .insert({
+          tenant_id: profile?.tenant_id,
+          citizen_id: user?.id,
+          file_id: storageData.id,
+          category: uploadCategory
+        });
+
+      if (linkError) throw linkError;
+
+      setShowUploadModal(false);
+      setUploadFile(null);
+      fetchData();
+    } catch (err: any) {
+      alert('Erreur upload: ' + err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -225,27 +357,54 @@ export const CitizenSpace: React.FC = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                  className="space-y-6"
                 >
-                  {documents.length > 0 ? documents.map((doc) => (
-                    <div key={doc.id} className="bento-card p-6 group hover:border-blue-500/30 transition-all">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="w-10 h-10 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400">
-                          <Shield className="w-5 h-5" />
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mes Documents Officiels</h3>
+                    <button 
+                      onClick={() => setShowUploadModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#008751] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#006b40] transition-all shadow-lg shadow-[#008751]/10"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Ajouter un document
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {documents.length > 0 ? documents.map((doc) => (
+                      <div key={doc.id} className="bento-card p-6 group hover:border-blue-500/30 transition-all flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="w-10 h-10 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400">
+                              <Shield className="w-5 h-5" />
+                            </div>
+                            <div className="flex gap-2">
+                              <a 
+                                href={doc.file?.public_url} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="p-2 text-gray-400 hover:text-blue-500 transition-colors"
+                              >
+                                <Download className="w-5 h-5" />
+                              </a>
+                            </div>
+                          </div>
+                          <h3 className="text-sm font-display font-bold text-gray-900 dark:text-white mb-1 line-clamp-1">{doc.file?.original_name}</h3>
+                          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{doc.category}</div>
                         </div>
-                        <button className="p-2 text-gray-400 hover:text-blue-500 transition-colors">
-                          <Download className="w-5 h-5" />
-                        </button>
+                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 flex justify-between items-center">
+                           <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{new Date(doc.created_at).toLocaleDateString()}</span>
+                           <button className="text-[9px] font-bold text-red-500 uppercase tracking-widest hover:underline">Supprimer</button>
+                        </div>
                       </div>
-                      <h3 className="text-sm font-display font-bold text-gray-900 dark:text-white mb-1 line-clamp-1">{doc.file?.original_name}</h3>
-                      <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{doc.category}</div>
-                    </div>
-                  )) : (
-                    <div className="col-span-full text-center py-20 bento-card border-dashed">
-                      <Shield className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                      <h3 className="text-lg font-display font-bold text-gray-900 dark:text-white">Votre coffre-fort est vide</h3>
-                    </div>
-                  )}
+                    )) : (
+                      <div className="col-span-full text-center py-20 bento-card border-dashed">
+                        <Shield className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-display font-bold text-gray-900 dark:text-white">Votre coffre-fort est vide</h3>
+                        <p className="text-xs text-gray-500 font-medium mt-2">Uploadez vos documents d'identité pour faciliter vos démarches</p>
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               )}
 
@@ -325,28 +484,101 @@ export const CitizenSpace: React.FC = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="bento-card p-8"
+                  className="bento-card p-8 space-y-8"
                 >
-                  <div className="flex items-center gap-6 mb-8">
-                    <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/20 rounded-3xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                      <User className="w-10 h-10" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="relative group">
+                        <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 rounded-[32px] flex items-center justify-center text-emerald-600 dark:text-emerald-400 overflow-hidden">
+                          {profile?.avatar_url ? (
+                            <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="w-12 h-12" />
+                          )}
+                        </div>
+                        <button className="absolute -bottom-2 -right-2 p-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/10 rounded-xl text-gray-500 shadow-xl opacity-0 group-hover:opacity-100 transition-all">
+                          <Camera className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{profile?.full_name}</h3>
+                        <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Niveau d'accès : {profile?.role}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{profile?.full_name}</h3>
-                      <p className="text-sm text-gray-500 uppercase font-bold tracking-widest">{profile?.role}</p>
-                    </div>
+                    <button 
+                      onClick={() => setIsEditingProfile(!isEditingProfile)}
+                      className={cn(
+                        "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        isEditingProfile ? "bg-gray-100 dark:bg-white/5 text-gray-600" : "bg-[#008751] text-white shadow-lg shadow-[#008751]/10"
+                      )}
+                    >
+                      {isEditingProfile ? 'Annuler' : 'Modifier le profil'}
+                    </button>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email</label>
-                       <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 text-sm font-medium dark:text-white">{user?.email}</div>
+                  {isEditingProfile ? (
+                    <form onSubmit={handleUpdateProfile} className="space-y-6 animate-in fade-in slide-in-from-top-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Nom Complet</label>
+                          <input 
+                            className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent focus:border-emerald-500 outline-none text-sm transition-all dark:text-white"
+                            value={profileForm.full_name}
+                            onChange={(e) => setProfileForm({...profileForm, full_name: e.target.value})}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Téléphone</label>
+                          <input 
+                            className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent focus:border-emerald-500 outline-none text-sm transition-all dark:text-white"
+                            value={profileForm.phone}
+                            onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Adresse Résidentielle</label>
+                          <input 
+                            className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent focus:border-emerald-500 outline-none text-sm transition-all dark:text-white"
+                            value={profileForm.address}
+                            onChange={(e) => setProfileForm({...profileForm, address: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Identifiant Unique (NPI)</label>
+                          <input 
+                            className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent focus:border-emerald-500 outline-none text-sm font-mono tracking-widest transition-all dark:text-white uppercase"
+                            value={profileForm.npi}
+                            onChange={(e) => setProfileForm({...profileForm, npi: e.target.value})}
+                            placeholder="Ex: 123456789"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end pt-4">
+                        <button type="submit" className="px-8 py-4 bg-[#008751] text-white rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 shadow-xl shadow-[#008751]/20 hover:scale-105 active:scale-95 transition-all">
+                          <Save className="w-4 h-4" />
+                          Enregistrer les modifications
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       {[
+                         { label: 'Email', value: user?.email, icon: Bell },
+                         { label: 'Téléphone', value: citizenProfile?.phone || 'Non renseigné', icon: Bell },
+                         { label: 'NPI', value: citizenProfile?.npi || 'Non renseigné', icon: Shield },
+                         { label: 'Adresse', value: citizenProfile?.address || 'Non renseignée', icon: MapPin },
+                       ].map((item, i) => (
+                         <div key={i} className="p-6 bg-gray-50 dark:bg-white/5 rounded-[28px] border border-gray-100 dark:border-white/5 group hover:border-emerald-500/20 transition-all">
+                            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                               <item.icon className="w-3 h-3 text-emerald-500" />
+                               {item.label}
+                            </h4>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">{item.value}</p>
+                         </div>
+                       ))}
                     </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Identifiant Unique (NPI)</label>
-                       <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 text-sm font-medium dark:text-white">Non renseigné</div>
-                    </div>
-                  </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -423,6 +655,94 @@ export const CitizenSpace: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Upload Modal */}
+      <AnimatePresence>
+        {showUploadModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowUploadModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-white dark:bg-[#131B2B] rounded-[40px] shadow-2xl border border-gray-100 dark:border-white/10 overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Nouveau Document</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Coffre-fort numérique sécurisé</p>
+                  </div>
+                  <button onClick={() => setShowUploadModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-all">
+                    <XCircle className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleFileUpload} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Catégorie</label>
+                    <select 
+                      className="w-full px-5 py-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent focus:border-emerald-500 outline-none text-sm font-bold transition-all dark:text-white appearance-none"
+                      value={uploadCategory}
+                      onChange={(e) => setUploadCategory(e.target.value)}
+                    >
+                      <option value="identity">Pièce d'Identité (CNI / Passeport)</option>
+                      <option value="residence">Certificat de Résidence</option>
+                      <option value="birth">Acte de Naissance</option>
+                      <option value="tax">Justificatif Fiscal</option>
+                      <option value="other">Autre Document</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Fichier</label>
+                    <div className="relative group">
+                      <input 
+                        type="file" 
+                        onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        required
+                      />
+                      <div className="p-8 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 group-hover:border-emerald-500/50 transition-all bg-gray-50/50 dark:bg-white/5">
+                        <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                          <Upload className="w-8 h-8" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white">
+                            {uploadFile ? uploadFile.name : "Cliquez ou glissez un fichier"}
+                          </p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-1">PDF, JPG, PNG (Max 10MB)</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={isUploading || !uploadFile}
+                    className="w-full py-5 bg-[#008751] text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 shadow-xl shadow-[#008751]/20 disabled:opacity-50 hover:bg-[#006b40] transition-all"
+                  >
+                    {isUploading ? (
+                      <RefreshCcw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-5 h-5" />
+                        Uploader en sécurité
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

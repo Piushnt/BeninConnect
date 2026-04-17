@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { supabase } from '../lib/supabase';
 import { useTenant } from '../contexts/TenantContext';
 import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -19,7 +20,31 @@ export const AIAssistant: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [poiContext, setPoiContext] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (tenant) {
+      fetchPoisForContext();
+    }
+  }, [tenant]);
+
+  const fetchPoisForContext = async () => {
+    try {
+      const { data } = await supabase
+        .from('locations')
+        .select('name, category, description')
+        .eq('tenant_id', tenant?.id)
+        .limit(10);
+      
+      if (data && data.length > 0) {
+        const context = data.map(p => `- ${p.name} (${p.category}): ${p.description}`).join('\n');
+        setPoiContext(context);
+      }
+    } catch (err) {
+      console.error('Error fetching context:', err);
+    }
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -67,6 +92,11 @@ export const AIAssistant: React.FC = () => {
       Contexte de la commune :
       - Nom : ${tenant?.name || 'National'}
       - Département ID : ${tenant?.department_id || 'Bénin'}
+
+      Points d'intérêt et services touristiques :
+      ${poiContext || 'Informations locales en cours de chargement...'}
+
+      Tu dois activement suggérer des points d'intérêt locaux et des activités culturelles aux citoyens et touristes.
     `;
 
     let assistantMessage = "";

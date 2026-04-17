@@ -83,3 +83,13 @@ BEGIN
     ON CONFLICT (tenant_id, page_id, section_id) DO UPDATE SET content = EXCLUDED.content;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Fonction pour s'auto-promouvoir super_admin (Utile pour le setup initial)
+CREATE OR REPLACE FUNCTION bootstrap_super_admin()
+RETURNS void AS $$
+BEGIN
+    UPDATE user_profiles 
+    SET role = 'super_admin' 
+    WHERE id = auth.uid();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

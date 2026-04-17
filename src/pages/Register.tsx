@@ -10,6 +10,7 @@ import { BRANDING } from '../constants';
 export const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [npi, setNpi] = useState('');
   const [adminPin, setAdminPin] = useState('');
@@ -24,6 +25,12 @@ export const Register: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas.');
+      setLoading(false);
+      return;
+    }
 
     try {
       // 1. Sign up user
@@ -214,6 +221,25 @@ export const Register: React.FC = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                Confirmer le mot de passe
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Shield className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="password"
+                  required
+                  className="block w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-white/5 border border-transparent focus:border-emerald-500/30 rounded-xl text-sm font-medium focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all dark:text-white"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
             </div>

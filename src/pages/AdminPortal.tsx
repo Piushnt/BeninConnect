@@ -241,7 +241,7 @@ export const AdminPortal: React.FC = () => {
       dossier_id: selectedDossier.id,
       agent_id: user?.id,
       status_id: selectedDossier.status_id,
-      comment: dossierNote
+      notes: dossierNote // Corrected from comment to notes
     });
 
     if (error) alert(error.message);
@@ -1025,10 +1025,10 @@ export const AdminPortal: React.FC = () => {
                         </div>
                         <div className="space-y-4 pt-4">
                            {dossierHistory.map(h => (
-                             <div key={h.id} className="p-3 border rounded-xl text-xs">
-                                <p className="font-bold">{h.agent?.full_name || 'Système'}</p>
-                                <p className="italic">"{h.comment}"</p>
-                                <p className="text-[10px] text-gray-400 mt-1">{formatDate(h.created_at)}</p>
+                             <div key={h.id} className="p-3 border dark:border-white/5 rounded-xl text-xs bg-gray-50/50 dark:bg-white/5">
+                                <p className="font-black text-gray-900 dark:text-white uppercase tracking-tight mb-1">{h.agent?.full_name || 'Système'}</p>
+                                <p className="text-gray-600 dark:text-gray-400 font-medium italic">"{h.notes}"</p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-2">{formatDate(h.created_at)}</p>
                              </div>
                            ))}
                         </div>

@@ -3,7 +3,7 @@ import { APIProvider, Map, Marker, InfoWindow, useMarkerRef } from '@vis.gl/reac
 import { supabase } from '../lib/supabase';
 import { useTenant } from '../contexts/TenantContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Info, X, Filter, Navigation } from 'lucide-react';
+import { MapPin, Info, X, Filter, Navigation, Search } from 'lucide-react';
 
 interface POI {
   id: string;
@@ -29,6 +29,7 @@ export const InteractiveMap: React.FC<{ initialCategory?: string }> = ({ initial
   const [pois, setPois] = useState<POI[]>([]);
   const [filteredPois, setFilteredPois] = useState<POI[]>([]);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,12 +42,23 @@ export const InteractiveMap: React.FC<{ initialCategory?: string }> = ({ initial
   }, [tenant]);
 
   useEffect(() => {
-    if (selectedCategory === 'all') {
-      setFilteredPois(pois);
-    } else {
-      setFilteredPois(pois.filter(p => p.category === selectedCategory));
+    let result = pois;
+    
+    if (selectedCategory !== 'all') {
+      result = result.filter(p => p.category === selectedCategory);
     }
-  }, [selectedCategory, pois]);
+    
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(q) || 
+        p.description.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+      );
+    }
+    
+    setFilteredPois(result);
+  }, [selectedCategory, searchQuery, pois]);
 
   const fetchPois = async () => {
     try {
@@ -77,22 +89,34 @@ export const InteractiveMap: React.FC<{ initialCategory?: string }> = ({ initial
 
   return (
     <div className="space-y-6">
-      {/* Category Filters */}
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.id)}
-            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
-              selectedCategory === cat.id
-                ? 'bg-[#008751] text-white shadow-lg shadow-[#008751]/20'
-                : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-800 hover:border-[#008751]'
-            }`}
-          >
-            <cat.icon className="w-3.5 h-3.5" />
-            {cat.label}
-          </button>
-        ))}
+      {/* Search and Category Filters */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-grow">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input 
+            type="text"
+            placeholder="Rechercher un lieu (ex: Marché, Mairie...)"
+            className="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 focus:border-[#008751] rounded-2xl text-[10px] font-bold uppercase tracking-widest outline-none dark:text-white transition-all shadow-sm"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+                selectedCategory === cat.id
+                  ? 'bg-[#008751] text-white shadow-lg shadow-[#008751]/20'
+                  : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-800 hover:border-[#008751]'
+              }`}
+            >
+              <cat.icon className="w-3.5 h-3.5" />
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Map Container */}

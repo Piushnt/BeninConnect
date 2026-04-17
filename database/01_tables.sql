@@ -316,6 +316,7 @@ CREATE TABLE user_subscriptions (
 CREATE TABLE signalements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
     citizen_id UUID REFERENCES user_profiles(id),
     category TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -489,12 +490,15 @@ CREATE TABLE arrondissement_addresses (
     arrondissement_id UUID NOT NULL REFERENCES arrondissements(id) ON DELETE CASCADE,
     label TEXT NOT NULL,
     value TEXT NOT NULL,
+    latitude DECIMAL(9,6),
+    longitude DECIMAL(9,6),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE locations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
     description TEXT,

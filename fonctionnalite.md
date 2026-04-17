@@ -38,8 +38,12 @@ Bénin Connect est une plateforme nationale d'e-gouvernance conçue pour digital
 - **Assistant Gemini** : Support basé sur des sources vérifiées. `[En attente de Var env : GEMINI_API_KEY]`
 - **Base de Connaissance** : Documents officiels pour alimenter l'IA. `[Simulé / À configurer]`
 
-## 8. Infrastructure & Sécurité
-- **Supabase Integration** : DB, Auth et Storage. `[Config nécessaire : VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY]`
-- **Row Level Security (RLS)** : Sécurisation granulaire. `[Développé]`
-- **Cartographie** : Points d'intérêt et géolocalisation. `[En attente de Var env : VITE_GOOGLE_MAPS_API_KEY]`
-- **Design Responsif** : Mobile, tablette et desktop. `[Développé]`
+## 9. Participation Citoyenne & Sondages
+- **Sondages en Temps Réel** : Création et participation aux consultations locales. `[Développé]`
+- **Système de Vote Sécurisé** : Un vote par utilisateur avec isolation par commune. `[Développé]`
+- **Visualisation Dynamique** : Résultats en temps réel avec animations fluides. `[Développé]`
+
+## 10. Design & Expérience Utilisateur
+- **Neo-Glassmorphism** : Interface moderne et épurée utilisant des effets de transparence et de flou. `[Développé]`
+- **Thème Sombre/Clair** : Support complet du mode sombre pour tout le portail. `[Développé]`
+- **Micro-animations** : Transitions fluides via Framer Motion pour une expérience premium. `[Développé]`

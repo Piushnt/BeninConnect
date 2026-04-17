@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useTenant } from '../contexts/TenantContext';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Phone, Users, Home, ChevronRight, Plus, Pencil, Trash2, X, Loader2, Save } from 'lucide-react';
+import { MapPin, Phone, Users, Home, ChevronRight, Plus, Pencil, Trash2, X, Loader2, Save, Info, Navigation, Search } from 'lucide-react';
+import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import { cn } from '../lib/utils';
 
 interface Arrondissement {
@@ -19,19 +20,99 @@ interface Address {
   arrondissement_id: string;
   label: string;
   value: string;
+  latitude?: number;
+  longitude?: number;
 }
+
+interface UserReport {
+  id: string;
+  arrondissement_id?: string;
+  category: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+}
+
+const MiniMap: React.FC<{ 
+  addresses: Address[]; 
+  reports: UserReport[];
+  center?: { lat: number; lng: number };
+}> = ({ addresses, reports, center }) => {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const [selectedItem, setSelectedItem] = useState<{ lat: number; lng: number; label: string; type: string } | null>(null);
+
+  if (!apiKey) return null;
+
+  // Filter addresses that have coordinates
+  const markers = [
+    ...addresses
+      .filter(a => a.latitude && a.longitude)
+      .map(a => ({ 
+        lat: Number(a.latitude), 
+        lng: Number(a.longitude), 
+        label: a.label,
+        type: 'mairie'
+      })),
+    ...reports.map(r => ({
+      lat: Number(r.latitude),
+      lng: Number(r.longitude),
+      label: r.category,
+      type: 'signalement'
+    }))
+  ];
+
+  if (markers.length === 0) return null;
+
+  // Use the first marker as default center if center is not provided
+  const defaultCenter = center || { lat: markers[0].lat, lng: markers[0].lng };
+
+  return (
+    <div className="h-48 w-full rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-800 mt-6 relative shadow-inner">
+      <APIProvider apiKey={apiKey}>
+        <Map
+          defaultCenter={defaultCenter}
+          defaultZoom={14}
+          gestureHandling={'greedy'}
+          disableDefaultUI={true}
+          mapId="mini-map"
+        >
+          {markers.map((m, idx) => (
+            <Marker 
+              key={idx} 
+              position={{ lat: m.lat, lng: m.lng }} 
+              onClick={() => setSelectedItem(m)}
+            />
+          ))}
+
+          {selectedItem && (
+            <InfoWindow
+              position={{ lat: selectedItem.lat, lng: selectedItem.lng }}
+              onCloseClick={() => setSelectedItem(null)}
+            >
+              <div className="p-1 px-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#008751]">{selectedItem.type}</p>
+                <p className="text-xs font-bold">{selectedItem.label}</p>
+              </div>
+            </InfoWindow>
+          )}
+        </Map>
+      </APIProvider>
+    </div>
+  );
+};
 
 export const Arrondissements: React.FC = () => {
   const { tenant } = useTenant();
   const { profile } = useAuth();
   const [arrondissements, setArrondissements] = useState<Arrondissement[]>([]);
   const [addresses, setAddresses] = useState<Record<string, Address[]>>({});
+  const [userReports, setUserReports] = useState<UserReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingArr, setEditingArr] = useState<Arrondissement | null>(null);
   const [isManaging, setIsManaging] = useState(false);
   
   // Address Form State
-  const [newAddress, setNewAddress] = useState({ label: '', value: '' });
+  const [newAddress, setNewAddress] = useState({ label: '', value: '', latitude: '', longitude: '' });
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -67,6 +148,15 @@ export const Arrondissements: React.FC = () => {
         });
         setAddresses(addrMap);
       }
+
+      // Fetch user reports (signalements) with locations
+      const { data: reportsData } = await supabase
+        .from('signalements')
+        .select('*')
+        .eq('tenant_id', tenant?.id)
+        .neq('latitude', null);
+      
+      setUserReports(reportsData || []);
     } catch (err) {
       console.error('Error fetching arrondissements:', err);
     } finally {
@@ -83,7 +173,9 @@ export const Arrondissements: React.FC = () => {
         .insert({
           arrondissement_id: arrId,
           label: newAddress.label,
-          value: newAddress.value
+          value: newAddress.value,
+          latitude: newAddress.latitude ? parseFloat(newAddress.latitude) : null,
+          longitude: newAddress.longitude ? parseFloat(newAddress.longitude) : null
         })
         .select()
         .single();
@@ -94,7 +186,7 @@ export const Arrondissements: React.FC = () => {
         ...prev,
         [arrId]: [...(prev[arrId] || []), data]
       }));
-      setNewAddress({ label: '', value: '' });
+      setNewAddress({ label: '', value: '', latitude: '', longitude: '' });
     } catch (err) {
       console.error('Error adding address:', err);
     }
@@ -184,6 +276,20 @@ export const Arrondissements: React.FC = () => {
                     <p className="font-bold text-gray-700 dark:text-gray-300">{arr.chef_arrondissement}</p>
                   </div>
                 </div>
+
+                {/* Village List */}
+                {arr.villages && arr.villages.length > 0 && (
+                  <div className="space-y-3 pt-4 border-t border-gray-50 dark:border-gray-800">
+                    <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em]">Villages & Quartiers ({arr.villages.length})</p>
+                    <div className="flex flex-wrap gap-2">
+                      {arr.villages.map((village, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-blue-50/50 dark:bg-blue-900/10 text-[10px] font-bold text-blue-700 dark:text-blue-300 rounded-lg uppercase tracking-wider">
+                          {village}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Addresses List */}
                 <div className="space-y-4 pt-4 border-t border-gray-50 dark:border-gray-800">
@@ -210,25 +316,51 @@ export const Arrondissements: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Mini Map */}
+                <MiniMap 
+                  addresses={addresses[arr.id] || []} 
+                  reports={userReports.filter(r => r.arrondissement_id === arr.id || !r.arrondissement_id)} // Showing all if id missing for now
+                />
               </div>
 
               {/* Add Address Form (Admin Only) */}
               {isManaging && (
                 <div className="mt-auto pt-6 border-t border-gray-50 dark:border-gray-800 space-y-3">
-                  <input 
-                    type="text"
-                    placeholder="Label (ex: Bureau)"
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#008751]/20 dark:text-white"
-                    value={newAddress.label}
-                    onChange={(e) => setNewAddress({...newAddress, label: e.target.value})}
-                  />
-                  <input 
-                    type="text"
-                    placeholder="Valeur (ex: Rue 123)"
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#008751]/20 dark:text-white"
-                    value={newAddress.value}
-                    onChange={(e) => setNewAddress({...newAddress, value: e.target.value})}
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input 
+                      type="text"
+                      placeholder="Label (ex: Mairie d'Arr.)"
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#008751]/20 dark:text-white"
+                      value={newAddress.label}
+                      onChange={(e) => setNewAddress({...newAddress, label: e.target.value})}
+                    />
+                    <input 
+                      type="text"
+                      placeholder="Adresse / Contact"
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#008751]/20 dark:text-white"
+                      value={newAddress.value}
+                      onChange={(e) => setNewAddress({...newAddress, value: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input 
+                      type="number"
+                      step="any"
+                      placeholder="Latitude"
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#008751]/20 dark:text-white"
+                      value={newAddress.latitude}
+                      onChange={(e) => setNewAddress({...newAddress, latitude: e.target.value})}
+                    />
+                    <input 
+                      type="number"
+                      step="any"
+                      placeholder="Longitude"
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#008751]/20 dark:text-white"
+                      value={newAddress.longitude}
+                      onChange={(e) => setNewAddress({...newAddress, longitude: e.target.value})}
+                    />
+                  </div>
                   <button 
                     onClick={() => handleAddAddress(arr.id)}
                     className="w-full py-2 bg-[#008751] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#006b40] transition-all flex items-center justify-center gap-2"

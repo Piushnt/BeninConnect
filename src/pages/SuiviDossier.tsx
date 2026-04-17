@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useTenant } from '../contexts/TenantContext';
 import { motion } from 'motion/react';
-import { Search, Loader2, CheckCircle2, Clock, AlertCircle, FileSearch } from 'lucide-react';
+import { Search, Loader2, CheckCircle2, Clock, AlertCircle, FileSearch, User } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 
 export const SuiviDossier: React.FC = () => {
@@ -111,63 +111,72 @@ export const SuiviDossier: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white dark:bg-gray-900 p-8 rounded-[40px] shadow-2xl border border-gray-100 dark:border-gray-800 mb-12"
         >
-          <form onSubmit={handleSearch} className="space-y-6">
-            <div className="relative">
-              <FileSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-6" />
-              <input 
-                type="text"
-                placeholder="Ex: ABC-123-XYZ"
-                className="w-full pl-14 pr-4 py-6 bg-gray-50 dark:bg-gray-800 rounded-2xl text-xl font-black uppercase tracking-widest focus:ring-4 focus:ring-[#008751]/10 outline-none transition-all placeholder:text-gray-300 dark:text-white"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-            </div>
+          <div className="flex gap-4 p-1 bg-gray-50 dark:bg-gray-800 rounded-2xl mb-8">
             <button 
-              id="search-submit-btn"
-              type="submit"
-              disabled={loading}
-              className="w-full py-6 bg-[#008751] text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-[#008751]/20 hover:bg-[#006b40] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
+              onClick={() => setShowNpiSearch(false)}
+              className={cn(
+                "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                !showNpiSearch ? "bg-white dark:bg-gray-900 text-[#008751] shadow-sm" : "text-gray-400"
+              )}
             >
-              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Vérifier l'état"}
+              Code de Suivi
             </button>
-          </form>
-
-          <div className="mt-6 text-center">
             <button 
-              onClick={() => setShowNpiSearch(!showNpiSearch)}
-              className="text-[10px] font-black text-[#008751] dark:text-green-400 uppercase tracking-widest hover:underline"
+              onClick={() => setShowNpiSearch(true)}
+              className={cn(
+                "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                showNpiSearch ? "bg-white dark:bg-gray-900 text-[#008751] shadow-sm" : "text-gray-400"
+              )}
             >
-              Obtenir mon code
+              Identification NPI
             </button>
           </div>
 
-          {showNpiSearch && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mt-8 p-8 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700"
-            >
-              <form onSubmit={handleNpiSearch} className="space-y-4">
-                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Entrez votre NPI pour retrouver votre dernier dossier</p>
-                <div className="flex gap-3">
-                  <input 
-                    type="text"
-                    placeholder="Votre NPI"
-                    className="flex-grow px-6 py-4 bg-white dark:bg-gray-900 rounded-xl text-sm font-bold outline-none border border-gray-100 dark:border-gray-700 focus:ring-2 focus:ring-[#008751]/20 dark:text-white"
-                    value={npi}
-                    onChange={(e) => setNpi(e.target.value)}
-                    required
-                  />
-                  <button 
-                    type="submit"
-                    disabled={npiLoading}
-                    className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
-                  >
-                    {npiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Rechercher"}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+          {!showNpiSearch ? (
+            <form onSubmit={handleSearch} className="space-y-6">
+              <div className="relative">
+                <FileSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-6" />
+                <input 
+                  type="text"
+                  placeholder="Ex: ABC-123-XYZ"
+                  className="w-full pl-14 pr-4 py-6 bg-gray-50 dark:bg-gray-800 rounded-2xl text-xl font-black uppercase tracking-widest focus:ring-4 focus:ring-[#008751]/10 outline-none transition-all placeholder:text-gray-300 dark:text-white"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+              </div>
+              <button 
+                id="search-submit-btn"
+                type="submit"
+                disabled={loading}
+                className="w-full py-6 bg-[#008751] text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-[#008751]/20 hover:bg-[#006b40] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
+              >
+                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Rechercher mon dossier"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleNpiSearch} className="space-y-6">
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-6" />
+                <input 
+                  type="text"
+                  placeholder="Votre NPI (Identifiant Unique)"
+                  className="w-full pl-14 pr-4 py-6 bg-gray-50 dark:bg-gray-800 rounded-2xl text-xl font-black uppercase tracking-widest focus:ring-4 focus:ring-[#008751]/10 outline-none transition-all placeholder:text-gray-300 dark:text-white"
+                  value={npi}
+                  onChange={(e) => setNpi(e.target.value)}
+                  required
+                />
+              </div>
+              <button 
+                type="submit"
+                disabled={npiLoading}
+                className="w-full py-6 bg-[#008751] text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-[#008751]/20 hover:bg-[#006b40] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
+              >
+                {npiLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Retrouver mes dossiers"}
+              </button>
+              <p className="text-[10px] text-gray-400 font-bold text-center uppercase tracking-widest">
+                Utilisez votre NPI pour retrouver le code de votre demande la plus récente.
+              </p>
+            </form>
           )}
 
           {error && (
