@@ -28,11 +28,11 @@ Bénin Connect est une plateforme nationale d'e-gouvernance conçue pour digital
 - **Centre de Notifications** : Accès rapide depuis la barre de navigation. `[Développé]`
 - **Gestion de Lecture** : Marquage individuel ou groupé. `[Développé]`
 
-## 6. Administration & Gouvernance
+## 6. Administration Globale & Gouvernance
+- **Tableau de Bord Ministériel** : Vue globale (Statistiques consolidées (KPIs, revenus, dossiers traités), graphiques en temps réel). `[Développé & Actif]`
+- **Super Administration Console** : Création/Déploiement des mairies, gestion des logs globaux d'infrastructure (Audit Logs), configuration du cloud (Public Services). `[Développé]`
 - **Rôles & Permissions** : `super_admin`, `admin`, `agent`, `citizen`. `[Développé]`
-- **Audit Log** : Journalisation des actions critiques. `[Développé]`
 - **Feature Flags** : Activation modulaire des fonctions par commune. `[Développé]`
-- **KPIs Nationaux** : Agrégation pour le pilotage ministériel. `[En cours / Proposition Dashboard]`
 
 ## 7. Intelligence Artificielle (Souveraine)
 - **Assistant Gemini** : Support basé sur des sources vérifiées. `[En attente de Var env : GEMINI_API_KEY]`

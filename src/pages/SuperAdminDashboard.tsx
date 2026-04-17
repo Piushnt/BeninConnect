@@ -57,6 +57,9 @@ export const SuperAdminDashboard: React.FC = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearch, setUserSearch] = useState('');
 
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [globalServices, setGlobalServices] = useState<any[]>([]);
+
   useEffect(() => {
     setCurrentPage(1);
     setTotalItems(0);
@@ -67,7 +70,51 @@ export const SuperAdminDashboard: React.FC = () => {
     fetchDepartments();
     if (activeTab === 'locations') fetchLocations();
     if (activeTab === 'users') fetchAllUsers();
+    if (activeTab === 'logs') fetchAuditLogs();
+    if (activeTab === 'config') fetchGlobalServices();
   }, [activeTab, currentPage, pageSize]);
+
+  const fetchAuditLogs = async () => {
+    try {
+      const { data, count, error } = await supabase
+        .from('audit_logs')
+        .select(`*, user:user_id(full_name, email)`, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      if (error) throw error;
+      setAuditLogs(data || []);
+      setTotalItems(count || 0);
+    } catch (err) {
+      console.error('Error fetching logs:', err);
+    }
+  };
+
+  const fetchGlobalServices = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('public_services')
+        .select('*')
+        .order('category')
+        .order('name');
+      if (error) throw error;
+      setGlobalServices(data || []);
+    } catch (err) {
+      console.error('Error fetching global services:', err);
+    }
+  };
+
+  const toggleGlobalService = async (serviceId: string, currentState: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('public_services')
+        .update({ is_active: !currentState })
+        .eq('id', serviceId);
+      if (error) throw error;
+      fetchGlobalServices();
+    } catch (err) {
+      alert('Erreur: ' + err);
+    }
+  };
 
   const fetchDepartments = async () => {
     const { data } = await supabase.from('departments').select('*').order('name');
@@ -734,32 +781,93 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
           )}
 
-          {['logs', 'config'].includes(activeTab) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bento-card p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
-                <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-6">
-                  <Activity className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-tight">Logs Système</h3>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-widest leading-relaxed">
-                  Surveillance en temps réel des activités système, erreurs et performances du cloud.
-                </p>
-                <div className="mt-6 px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                  Opérationnel
-                </div>
-              </div>
+          {['logs'].includes(activeTab) && (
+            <div className="bento-card overflow-hidden">
+               <div className="p-6 md:p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+                  <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white">Logs & Activités Système</h2>
+                  <div className="bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2 rounded-xl text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                     Tracking Actif
+                  </div>
+               </div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-gray-50/50 dark:bg-white/5">
+                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Date & Heure</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Utilisateur</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Action</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Entité</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                      {auditLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5">
+                          <td className="px-6 py-4 text-xs font-medium text-gray-600 dark:text-gray-400">
+                             {new Date(log.created_at).toLocaleString('fr-FR')}
+                          </td>
+                          <td className="px-6 py-4">
+                             <div className="flex flex-col">
+                               <span className="text-sm font-bold text-gray-900 dark:text-white">{log.user?.full_name || 'Système'}</span>
+                               <span className="text-[10px] text-gray-500">{log.user?.email || 'N/A'}</span>
+                             </div>
+                          </td>
+                          <td className="px-6 py-4">
+                             <span className={cn(
+                               "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest",
+                               log.action === 'CREATE' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' :
+                               log.action === 'UPDATE' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' :
+                               log.action === 'DELETE' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' :
+                               'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400'
+                             )}>
+                               {log.action}
+                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-mono text-gray-500">
+                             {log.entity_type} {log.entity_id ? `(${log.entity_id.split('-')[0]}...)` : ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                 </table>
+               </div>
+               <Pagination 
+                 total={totalItems} 
+                 current={currentPage} 
+                 pageSize={pageSize}
+                 onChange={setCurrentPage}
+                 onPageSizeChange={setPageSize}
+               />
+            </div>
+          )}
 
-              <div className="bento-card p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
-                <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-6">
-                  <Settings className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-tight">Configuration Cloud</h3>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-widest leading-relaxed">
-                  Paramètres globaux de l'infrastructure, clés API et quotas de ressources.
-                </p>
-                <div className="mt-6 px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                  Opérationnel
-                </div>
+          {['config'].includes(activeTab) && (
+            <div className="space-y-6">
+              <div className="bento-card p-6 md:p-8 border-b border-gray-100 dark:border-white/5">
+                <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white">Catalogue National des E-Services</h2>
+                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Activez ou désactivez globalement les services pour toutes les communes</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 {globalServices.map(service => (
+                   <div key={service.id} className="card-glass p-6 space-y-4">
+                      <div className="flex justify-between items-start">
+                         <span className="text-[9px] font-bold uppercase tracking-widest text-primary">{service.category}</span>
+                         <button 
+                           onClick={() => toggleGlobalService(service.id, service.is_active)}
+                           className={cn(
+                             "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all",
+                             service.is_active ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-500"
+                           )}
+                         >
+                           {service.is_active ? 'Globalement Actif' : 'Désactivé'}
+                         </button>
+                      </div>
+                      <div>
+                         <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase leading-tight mb-2">{service.name}</h3>
+                         <p className="text-xs text-gray-500 line-clamp-2">{service.description}</p>
+                      </div>
+                   </div>
+                 ))}
               </div>
             </div>
           )}
