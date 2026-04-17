@@ -118,7 +118,17 @@ CREATE TABLE user_profiles (
 CREATE OR REPLACE FUNCTION get_my_role()
 RETURNS TEXT AS $$
     SELECT role FROM user_profiles WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER;
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION get_my_tenant_id()
+RETURNS UUID AS $$
+    SELECT tenant_id FROM user_profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION get_my_arrondissement_id()
+RETURNS UUID AS $$
+    SELECT arrondissement_id FROM user_profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION is_admin_for_tenant(t_id UUID)
 RETURNS BOOLEAN AS $$
@@ -127,7 +137,7 @@ RETURNS BOOLEAN AS $$
         WHERE id = auth.uid() 
         AND (role = 'super_admin' OR (role IN ('admin', 'ca_admin') AND tenant_id = t_id))
     );
-$$ LANGUAGE sql SECURITY DEFINER;
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION is_staff_for_tenant(t_id UUID)
 RETURNS BOOLEAN AS $$
@@ -136,7 +146,7 @@ RETURNS BOOLEAN AS $$
         WHERE id = auth.uid() 
         AND (role = 'super_admin' OR (tenant_id = t_id AND role IN ('admin', 'agent', 'ca_admin')))
     );
-$$ LANGUAGE sql SECURITY DEFINER;
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 -- Profils Citoyens (Données Nationales)
 CREATE TABLE citizen_profiles (
@@ -819,18 +829,18 @@ CREATE POLICY "Field visits are viewable by staff or dossier owner" ON field_vis
 );
 CREATE POLICY "Staff can manage field visits" ON field_visits FOR ALL USING (is_staff_for_tenant(tenant_id));
 
--- POLITIQUES ARRONDISSEMENTS
+-- POLITIQUES ARRONDISSEMENTS (Fix 42P17 Recursion)
 CREATE POLICY "Chef Arrondissement can manage their arrondissement" ON user_profiles FOR ALL USING (
-    (role = 'ca_admin' AND arrondissement_id = (SELECT arrondissement_id FROM user_profiles WHERE id = auth.uid())) OR
+    (get_my_role() = 'ca_admin' AND arrondissement_id = get_my_arrondissement_id()) OR
     is_admin_for_tenant(tenant_id)
 );
 CREATE POLICY "Super admins can manage all profiles" ON user_profiles FOR ALL USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'super_admin')
+    get_my_role() = 'super_admin'
 );
 CREATE POLICY "Profiles viewable by owner or staff" ON user_profiles FOR SELECT USING (
     auth.uid() = id OR 
     is_admin_for_tenant(tenant_id) OR
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'super_admin')
+    get_my_role() = 'super_admin'
 );
 CREATE POLICY "Users can insert their own profile" ON user_profiles FOR INSERT WITH CHECK (
     (auth.uid() = id OR auth.uid() IS NULL) -- Allow signup when email confirmation is pending
