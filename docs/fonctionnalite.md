@@ -20,8 +20,9 @@ Bénin Connect est une plateforme nationale d'e-gouvernance conçue pour digital
 ## 4. Espace Citoyen
 - **Mon Espace** : Interface dédiée pour le citoyen. `[Développé]`
 - **Suivi des Dossiers** : Visualisation en temps réel de l'avancement. `[Développé]`
-- **Coffre-fort Numérique** : Gestion des documents personnels. `[Développé - Nécessite Config Storage]`
-- **Profil Utilisateur** : Informations et préférences. `[Développé]`
+- **Coffre-fort Numérique** : Gestion des documents personnels. `[Développé]`
+- **Vérification d'Email** : Flux sécurisé pour la confirmation de compte citoyen. `[Développé - NOUVEAU]`
+- **Profil Utilisateur** : Informations et préférences avec création automatisée via trigger DB. `[Développé]`
 
 ## 5. Système de Notifications Avancé
 - **Notifications Ciblées** : Envoi par commune, rôle ou utilisateur. `[Développé]`
@@ -42,6 +43,11 @@ Bénin Connect est une plateforme nationale d'e-gouvernance conçue pour digital
 - **Sondages en Temps Réel** : Création et participation aux consultations locales. `[Développé]`
 - **Système de Vote Sécurisé** : Un vote par utilisateur avec isolation par commune. `[Développé]`
 - **Visualisation Dynamique** : Résultats en temps réel avec animations fluides. `[Développé]`
+
+## 11. Communication Officielle & Annonces
+- **Page Annonces** : Centralisation des avis officiels, décrets et recrutements municipaux. `[Développé - NOUVEAU]`
+- **Filtrage par Catégorie** : Distinction claire entre alertes urgentes et informations générales. `[Développé]`
+- **Interactivité Cartographique** : Possibilité pour les citoyens d'ajouter des points d'intérêt ou de signalement directement sur la carte interactive. `[Développé - NOUVEAU]`
 
 ## 10. Design & Expérience Utilisateur
 - **Neo-Glassmorphism** : Interface moderne et épurée utilisant des effets de transparence et de flou. `[Développé]`

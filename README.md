@@ -31,8 +31,12 @@
 1. Installez les dépendances : `npm install`
 2. Configurez vos variables d'environnement (`.env`) contenant les clés Supabase & Gemini.
 3. **Synchronisation Base de données** :
-   - Exécutez le script contenu dans `/schema.sql`. Il est garanti stable et inclut la suppression des contraintes sur le système de Rôles pour éviter les blocages lors de la gestion manuelle depuis la console Supabase (GUI).
-   - Les scripts sont aussi découpés dans `/database/` (`01_tables.sql`, `02_functions_triggers.sql`, `03_rls_policies.sql`) pour une exécution séquentielle ou un diagnostic asynchrone modulaire.
+   - Exécutez le script complet contenu dans `/schema.sql`. Il est garanti stable et configure l'intégralité de l'infrastructure (tables, triggers, RLS, et données initiales).
+   - Alternativement, utilisez les scripts consolidés dans `/database/` exécutés dans l'ordre :
+     1. `01_tables.sql` (Structure)
+     2. `02_functions_triggers.sql` (Logique & Automatisation)
+     3. `03_rls_policies.sql` (Sécurité RLS)
+     4. `04_seed_data.sql` (Données de démonstration et départements)
 4. Lancez le serveur local : `npm run dev` ou build pour production : `npm run build`
 
 ## 👑 Rôles & Accès Sécurisés
