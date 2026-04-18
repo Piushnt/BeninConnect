@@ -100,6 +100,7 @@ export const Navbar: React.FC = () => {
         { label: 'Guide Touristique', path: `/${slug}/tourisme` },
       ]
     },
+    { label: 'Annonces', path: `/${slug}/annonces` },
     { label: 'Actualités', path: slug ? `/${slug}/actualites` : '/actualites' },
     { label: 'Contact', path: `/${slug}/contact` },
   ];

@@ -53,6 +53,7 @@ DROP TABLE IF EXISTS polls CASCADE;
 DROP TABLE IF EXISTS poll_options CASCADE;
 DROP TABLE IF EXISTS poll_votes CASCADE;
 DROP TABLE IF EXISTS invitations CASCADE;
+DROP TABLE IF EXISTS announcements CASCADE;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -651,3 +652,33 @@ CREATE TABLE budget_votes (
     created_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (project_id, user_id)
 );
+
+-- ===============================================================
+-- 23. ANNONCES OFFICIELLES (AVIS ET DÉCRETS)
+-- ===============================================================
+
+CREATE TABLE announcements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('Avis', 'Décret', 'Recrutement', 'Information', 'Urgent')),
+    image_url TEXT,
+    document_url TEXT, -- Pour les PDF officiels
+    author_id UUID REFERENCES user_profiles(id),
+    published_at TIMESTAMPTZ DEFAULT now(),
+    expires_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index pour la recherche et le filtrage
+CREATE INDEX idx_announcements_tenant ON announcements(tenant_id);
+CREATE INDEX idx_announcements_category ON announcements(category);
+CREATE INDEX idx_announcements_published ON announcements(published_at DESC);
+
+-- Trigger pour updated_at
+CREATE TRIGGER set_announcements_updated_at
+    BEFORE UPDATE ON announcements
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

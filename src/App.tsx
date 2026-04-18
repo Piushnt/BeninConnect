@@ -19,6 +19,7 @@ const Services = lazy(() => import('./pages/Services').then(m => ({ default: m.S
 const SuiviDossier = lazy(() => import('./pages/SuiviDossier').then(m => ({ default: m.SuiviDossier })));
 const Simulateur = lazy(() => import('./pages/Simulateur').then(m => ({ default: m.Simulateur })));
 const Actualites = lazy(() => import('./pages/Actualites').then(m => ({ default: m.Actualites })));
+const Annonces = lazy(() => import('./pages/Annonces').then(m => ({ default: m.Annonces })));
 const Sondages = lazy(() => import('./pages/Sondages').then(m => ({ default: m.Sondages })));
 const Signalement = lazy(() => import('./pages/Signalement').then(m => ({ default: m.Signalement })));
 const Stade = lazy(() => import('./pages/Stade').then(m => ({ default: m.Stade })));
@@ -178,6 +179,7 @@ export default function App() {
                   <Route path="/:slug/suivi-dossier" element={<TenantWrapper><SuiviDossier /></TenantWrapper>} />
                   <Route path="/:slug/simulateur" element={<TenantWrapper><Simulateur /></TenantWrapper>} />
                   <Route path="/:slug/actualites" element={<TenantWrapper><Actualites /></TenantWrapper>} />
+                  <Route path="/:slug/annonces" element={<TenantWrapper><Annonces /></TenantWrapper>} />
                   <Route path="/:slug/sondages" element={<TenantWrapper><Sondages /></TenantWrapper>} />
                   <Route path="/:slug/signalement" element={<TenantWrapper><Signalement /></TenantWrapper>} />
                   <Route path="/:slug/stade" element={<TenantWrapper><Stade /></TenantWrapper>} />
