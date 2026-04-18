@@ -52,6 +52,7 @@ const ArrondissementModule = lazy(() => import('./pages/ArrondissementModule').t
 
 const VerifyIdentity = lazy(() => import('./pages/VerifyIdentity').then(m => ({ default: m.VerifyIdentity })));
 const MinisterialDashboard = lazy(() => import('./pages/MinisterialDashboard').then(m => ({ default: m.MinisterialDashboard })));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail').then(m => ({ default: m.VerifyEmail })));
 
 const NotFound = () => (
   <Layout>
@@ -169,6 +170,7 @@ export default function App() {
                   {/* Auth */}
                   <Route path="/auth/login" element={<Login />} />
                   <Route path="/auth/register" element={<Register />} />
+                  <Route path="/auth/verify-email" element={<VerifyEmail />} />
 
                   {/* Local Portal Routes */}
                   <Route path="/:slug" element={<TenantWrapper><LocalHome /></TenantWrapper>} />

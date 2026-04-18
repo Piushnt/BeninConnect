@@ -1,6 +1,10 @@
 -- ===============================================================
--- 9. TRIGGERS & AUTOMATISATION
+-- 2. FONCTIONS, TRIGGERS & AUTOMATISATION
 -- ===============================================================
+
+-- ---------------------------------------------------------------
+-- A. UTILITAIRES DE SESSION & RÔLES
+-- ---------------------------------------------------------------
 
 -- Fonction pour vérifier le rôle sans récursion (Fix 42P17)
 CREATE OR REPLACE FUNCTION get_my_role()
@@ -36,7 +40,10 @@ RETURNS BOOLEAN AS $$
     );
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
--- Mise à jour automatique updated_at
+-- ---------------------------------------------------------------
+-- B. TRIGGERS DE MISE À JOUR (updated_at)
+-- ---------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -45,11 +52,55 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Triggers de mise à jour updated_at
+-- Triggers de mise à jour automatique
+DROP TRIGGER IF EXISTS update_tenants_updated_at ON tenants;
 CREATE TRIGGER update_tenants_updated_at BEFORE UPDATE ON tenants FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_dossiers_updated_at ON dossiers;
 CREATE TRIGGER update_dossiers_updated_at BEFORE UPDATE ON dossiers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_announcements_updated_at ON announcements;
 CREATE TRIGGER update_announcements_updated_at BEFORE UPDATE ON announcements FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- ---------------------------------------------------------------
+-- C. AUTOMATISATION DE L'INSCRIPTION (Profiles)
+-- ---------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  -- 1. Insertion dans user_profiles
+  INSERT INTO public.user_profiles (id, full_name, role, tenant_id, is_approved)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'full_name', 'Citoyen'),
+    'citizen',
+    (new.raw_user_meta_data->>'tenant_id')::uuid,
+    true
+  );
+
+  -- 2. Insertion dans citizen_profiles
+  INSERT INTO public.citizen_profiles (id, npi)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'npi', 'PENDING')
+  );
+
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ---------------------------------------------------------------
+-- D. WORKFLOWS DOSSIERS & INITIALISATION
+-- ---------------------------------------------------------------
 
 -- Historique des dossiers automatique
 CREATE OR REPLACE FUNCTION log_dossier_status_change()
@@ -63,6 +114,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS dossier_status_log ON dossiers;
 CREATE TRIGGER dossier_status_log AFTER UPDATE ON dossiers FOR EACH ROW EXECUTE PROCEDURE log_dossier_status_change();
 
 -- Fonction pour initialiser une nouvelle commune
@@ -86,6 +138,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ---------------------------------------------------------------
+-- E. ADMINISTRATION & BOOTSTRAP
+-- ---------------------------------------------------------------
+
 -- Fonction pour s'auto-promouvoir super_admin (Utile pour le setup initial)
 CREATE OR REPLACE FUNCTION bootstrap_super_admin()
 RETURNS void AS $$
@@ -93,33 +149,5 @@ BEGIN
     UPDATE user_profiles 
     SET role = 'super_admin' 
     WHERE id = auth.uid();
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Fonction pour gérer la création sécurisée d'un profil administrateur par un Super Admin (RPC)
-CREATE OR REPLACE FUNCTION create_admin_user(
-  admin_email TEXT,
-  admin_fullname TEXT,
-  admin_role TEXT,
-  target_tenant_id UUID DEFAULT NULL
-) RETURNS UUID AS $$
-DECLARE
-  new_user_id UUID;
-BEGIN
-  -- Seuls les super admins peuvent créer d'autres admins via cette fonction (Double vérification)
-  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('super_admin', 'super-admin')) THEN
-     RAISE EXCEPTION 'Non autorisé: Seul un Super Admin peut inviter des administrateurs.';
-  END IF;
-
-  -- Si l'email est déjà dans auth.users: on modifie le rôle.
-  SELECT id INTO new_user_id FROM auth.users WHERE email = admin_email;
-  
-  IF new_user_id IS NOT NULL THEN
-     UPDATE user_profiles SET role = admin_role, tenant_id = target_tenant_id, full_name = admin_fullname WHERE id = new_user_id;
-     RETURN new_user_id;
-  ELSE
-     -- Si l'utilisateur n'existe pas encore, on crée une "invitation pending"
-     RAISE EXCEPTION 'Utilisateur introuvable. Le futur admin doit d''abord se connecter une fois (Magic Link) pour que son profil soit créé.';
-  END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

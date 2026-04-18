@@ -41,13 +41,20 @@ export const NotificationCenter: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
+      let orFilter = `user_id.eq.${user.id},and(user_id.is.null,tenant_id.is.null)`;
+      
+      // Add tenant filter only if tenant is available to avoid 400 error
+      if (tenant?.id) {
+        orFilter += `,and(user_id.is.null,tenant_id.eq.${tenant.id})`;
+      }
+
       const { data, error } = await supabase
         .from('notification_targets')
         .select(`
           *,
           notification:notifications(*)
         `)
-        .or(`user_id.eq.${user.id},and(user_id.is.null,tenant_id.eq.${tenant?.id || ''}),and(user_id.is.null,tenant_id.is.null)`)
+        .or(orFilter)
         .order('created_at', { ascending: false })
         .limit(20);
 

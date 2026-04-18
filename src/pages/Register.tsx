@@ -33,51 +33,25 @@ export const Register: React.FC = () => {
     }
 
     try {
-      // 1. Sign up user
+      // 1. Sign up user with metadata for the trigger
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            tenant_id: tenant?.id,
+            npi: npi.trim()
+          }
+        }
       });
 
       if (authError) throw authError;
-
-      if (authData.user) {
-        // Everyone starts as a citizen as requested. 
-        // Elevation is handled by Super Admin in the dashboard.
-        const role = 'citizen';
-        const isApproved = true; 
-
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: authData.user.id,
-            tenant_id: tenant?.id,
-            full_name: fullName,
-            role: role,
-            is_approved: isApproved
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          throw new Error(`Erreur lors de la création du profil: ${profileError.message}`);
-        }
-
-        // 3. Create citizen profile if role is citizen
-        if (role === 'citizen') {
-          const { error: citizenError } = await supabase
-            .from('citizen_profiles')
-            .insert({
-              id: authData.user.id,
-              npi: npi.trim()
-            });
-          if (citizenError) {
-            console.error('Citizen profile creation error:', citizenError);
-            throw new Error(`Erreur lors de la création du profil citoyen: ${citizenError.message}`);
-          }
-        }
-        
-        setSuccess(true);
-      }
+      
+      // No need to manually insert into user_profiles or citizen_profiles
+      // The PostgreSQL trigger 'on_auth_user_created' in 08_auth_triggers.sql handles it.
+      
+      setSuccess(true);
     } catch (err: any) {
       setError(err.message);
     } finally {

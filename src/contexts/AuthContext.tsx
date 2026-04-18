@@ -41,17 +41,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const fetchProfile = async (userId: string) => {
+    // If we're here, we have a user object. 
+    // However, if email isn't confirmed, fetching the profile might fail due to RLS.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !user.email_confirmed_at) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid 406 when row doesn't exist yet
 
       if (error) throw error;
       setProfile(data);
     } catch (err) {
-      console.error('Error fetching profile:', err);
+      // Silently handle profile fetch errors during transition or for unconfirmed accounts
+      console.warn('Profile not accessible yet or unconfirmed account');
     } finally {
       setLoading(false);
     }

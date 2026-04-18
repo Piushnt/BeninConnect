@@ -27,6 +27,10 @@ export const Login: React.FC = () => {
       if (error) throw error;
       navigate(-1); // Go back to previous page
     } catch (err: any) {
+      if (err.message?.includes('Email not confirmed')) {
+        navigate(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
       setError(err.message);
     } finally {
       setLoading(false);

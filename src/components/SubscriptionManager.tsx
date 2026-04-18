@@ -29,12 +29,18 @@ export const SubscriptionManager: React.FC = () => {
   const checkSubscription = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('user_subscriptions')
         .select('*')
-        .eq('user_id', user.id)
-        .eq('tenant_id', tenant?.id || null)
-        .maybeSingle();
+        .eq('user_id', user.id);
+
+      if (tenant?.id) {
+        query.eq('tenant_id', tenant.id);
+      } else {
+        query.is('tenant_id', null);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (data) setIsSubscribed(true);
     } catch (err) {
