@@ -13,10 +13,14 @@ DROP POLICY IF EXISTS "Super admins can manage all profiles" ON user_profiles;
 -- On utilise auth.uid() directement sans passer par get_my_role() pour éviter la récursion
 CREATE POLICY "Profiles are viewable by owner" ON user_profiles FOR SELECT USING (auth.uid() = id);
 
+-- NOTE: La politique de vue du staff utilise une sous-requête AUTH (SECURITY DEFINER)
+-- pour éviter toute récursion avec user_profiles. La fonction get_my_role() est SECURITY DEFINER
+-- donc elle accède à la table directement sans passer par RLS (pas de récursion).
 CREATE POLICY "Staff can view profiles for their tenant" ON user_profiles FOR SELECT USING (
-    EXISTS (
-        SELECT 1 FROM user_profiles
-        WHERE id = auth.uid() AND (role IN ('super_admin', 'super-admin') OR (role IN ('admin', 'agent', 'ca_admin') AND tenant_id = user_profiles.tenant_id))
+    get_my_role() IN ('super_admin', 'super-admin')
+    OR (
+        get_my_role() IN ('admin', 'agent', 'ca_admin')
+        AND tenant_id = get_my_tenant_id()
     )
 );
 
@@ -63,10 +67,19 @@ CREATE POLICY "News likes are public" ON news_likes FOR SELECT USING (true);
 CREATE POLICY "Auth users can engage with news" ON news_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Auth users can like news" ON news_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- NEWS BOOKMARKS
+CREATE POLICY "Users manage their own bookmarks" ON news_bookmarks FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Bookmarks are public" ON news_bookmarks FOR SELECT USING (true);
+
 -- 6. AUDIENCES & RÉSERVATIONS
-CREATE POLICY "Users can manage their own audiences" ON audiences FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Audience creation" ON audiences FOR INSERT WITH CHECK (true);
-CREATE POLICY "Staff can manage audiences" ON audiences FOR ALL USING (is_staff_for_tenant(tenant_id));
+-- On sépare les opérations pour éviter les conflits entre politiques ALL multiples
+CREATE POLICY "Users can view their own audiences" ON audiences FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Audience creation by anyone" ON audiences FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can update their own audiences" ON audiences FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own audiences" ON audiences FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Staff can view all audiences" ON audiences FOR SELECT USING (is_staff_for_tenant(tenant_id));
+CREATE POLICY "Staff can update audiences" ON audiences FOR UPDATE USING (is_staff_for_tenant(tenant_id));
+CREATE POLICY "Staff can delete audiences" ON audiences FOR DELETE USING (is_staff_for_tenant(tenant_id));
 
 CREATE POLICY "Users can manage their own reservations" ON reservations_stade FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Staff can manage reservations" ON reservations_stade FOR ALL USING (is_staff_for_tenant(tenant_id));

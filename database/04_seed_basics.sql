@@ -20,12 +20,15 @@ ON CONFLICT (name) DO NOTHING;
 
 -- Statuts Workflow
 INSERT INTO dossier_statuses (id, label, color_code) VALUES
-('BROUILLON', 'Brouillon', '#6B7280'),
-('SOUMIS', 'Soumis', '#3B82F6'),
-('EN_INSTRUCTION', 'En cours d''instruction', '#F59E0B'),
-('ATTENTE_PAIEMENT', 'Attente de paiement', '#EF4444'),
-('PAYÉ', 'Payé', '#10B981'),
-('TERMINÉ', 'Terminé', '#059669')
+('BROUILLON',         'Brouillon',                '#6B7280'),
+('SOUMIS',            'Soumis',                   '#3B82F6'),
+('EN_REVISION',       'En révision',              '#F59E0B'),
+('EN_INSTRUCTION',    'En cours d''instruction',  '#F59E0B'),
+('ATTENTE_PAIEMENT',  'Attente de paiement',      '#EF4444'),
+('APPROUVÉ',          'Approuvé',                 '#10B981'),
+('PAYÉ',              'Payé',                     '#10B981'),
+('REJETÉ',            'Rejeté',                   '#EF4444'),
+('TERMINÉ',           'Terminé',                  '#059669')
 ON CONFLICT (id) DO NOTHING;
 
 -- Features

@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION bootstrap_super_admin()
 RETURNS void AS $$
 BEGIN
     -- Seul l'email du créateur peut s'auto-promouvoir via cette fonction
-    IF (SELECT email FROM auth.users WHERE id = auth.uid()) = 'ulrichhononta@gmail.com' THEN
+    IF (SELECT email FROM auth.users WHERE id = auth.uid()) = 'piushononta05@gmail.com' THEN
         UPDATE user_profiles 
         SET role = 'super_admin' 
         WHERE id = auth.uid();

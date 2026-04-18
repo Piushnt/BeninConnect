@@ -456,7 +456,7 @@ CREATE TABLE market_stands (
     market_name TEXT NOT NULL,
     stand_number TEXT NOT NULL,
     category TEXT,
-    status TEXT DEFAULT 'available' CHECK (status IN ('available', 'occupied', 'reserved', 'maintenance')),
+    status TEXT DEFAULT 'LIBRE',  -- Valeurs: LIBRE, OCCUPÉ, RÉSERVÉ, MAINTENANCE (aligné avec le frontend)
     monthly_rent DECIMAL(12,2),
     location_data JSONB,
     created_at TIMESTAMPTZ DEFAULT now()
@@ -467,7 +467,7 @@ CREATE TABLE market_registrations (
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     citizen_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     stand_id UUID REFERENCES market_stands(id),
-    status TEXT DEFAULT 'submitted' CHECK (status IN ('submitted', 'under_review', 'approved', 'rejected', 'terminated')),
+    status TEXT DEFAULT 'EN_ATTENTE',  -- Valeurs: EN_ATTENTE, APPROUVÉ, REJETÉ, TERMINÉ (aligné frontend)
     requested_market TEXT,
     requested_category TEXT,
     contract_url TEXT,
