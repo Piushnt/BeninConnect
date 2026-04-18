@@ -54,6 +54,9 @@ import { generateSignatureHash } from '../lib/cryptoUtils';
 import { generateOfficialPDF } from '../lib/pdfGenerator';
 import { AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
+import { AgendaFlashModule } from '../features/admin/AgendaFlashModule';
+import { SondageModule } from '../features/admin/SondageModule';
+import { CMSModule } from '../features/admin/CMSModule';
 
 export const AdminPortal: React.FC = () => {
   const { tenant } = useTenant();
@@ -347,6 +350,18 @@ export const AdminPortal: React.FC = () => {
         agent_id: user?.id,
         notes: `Mise à jour manuelle. Passé de ${prevStatus || 'NR'} à ${newStatus}`
       });
+
+      if (selectedDossier?.citizen_id) {
+        const { data: notif } = await supabase.from('notifications').insert({
+          tenant_id: tenant?.id,
+          title: `Mise à jour de votre dossier ${selectedDossier.tracking_code}`,
+          body: `Votre dossier est maintenant au statut : ${newStatus}.`,
+          type: 'info'
+        }).select().single();
+        if (notif) {
+          await supabase.from('notification_targets').insert({ notification_id: notif.id, user_id: selectedDossier.citizen_id, status: 'unread' });
+        }
+      }
       
       setFeedback({ type: 'success', msg: 'Statut mis à jour avec succès' });
       setSelectedDossier((prev: any) => ({ ...prev, status_id: newStatus }));
@@ -409,6 +424,18 @@ export const AdminPortal: React.FC = () => {
         .eq('id', selectedDossier.id);
 
       if (updateError) throw updateError;
+
+      if (selectedDossier?.citizen_id) {
+        const { data: notif } = await supabase.from('notifications').insert({
+          tenant_id: tenant?.id,
+          title: `Document Prêt : ${selectedDossier.tracking_code}`,
+          body: `Votre document a été signé. Vous pouvez maintenant le télécharger ou passer en mairie.`,
+          type: 'success'
+        }).select().single();
+        if (notif) {
+          await supabase.from('notification_targets').insert({ notification_id: notif.id, user_id: selectedDossier.citizen_id, status: 'unread' });
+        }
+      }
 
       setFeedback({ type: 'success', msg: 'Document signé et archivé avec succès' });
       setSelectedDossier((prev: any) => ({ 
@@ -884,124 +911,11 @@ export const AdminPortal: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'social' && (
-          <div className="space-y-12 animate-in fade-in duration-700">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase">Communication Flash & Agenda</h2>
-              <div className="flex gap-4">
-                 <button className="btn-primary" onClick={() => {/* logic */}}>Nouveau Flash</button>
-                 <button className="btn-primary" onClick={() => {/* logic */}}>Nouvel Événement</button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-               <div className="card-glass p-8 space-y-6">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                    <Zap className="w-4 h-4" />
-                    Fil d'Infos Flash
-                  </h3>
-                  <div className="space-y-4">
-                     {flashNews.map(f => (
-                       <div key={f.id} className="p-4 bg-white/50 dark:bg-white/5 rounded-2xl flex justify-between items-center">
-                          <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{f.content}</p>
-                          <button onClick={async () => {
-                             await supabase.from('flash_news').delete().eq('id', f.id);
-                             fetchFlashNews();
-                          }} className="text-red-500 hover:scale-110 transition-transform"><Trash2 className="w-4 h-4" /></button>
-                       </div>
-                     ))}
-                  </div>
-               </div>
+        {activeTab === 'social' && <AgendaFlashModule />}
 
-               <div className="card-glass p-8 space-y-6">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Agenda Municipal
-                  </h3>
-                  <div className="space-y-4">
-                     {agendaEvents.map(e => (
-                       <div key={e.id} className="p-4 bg-white/50 dark:bg-white/5 rounded-2xl flex justify-between items-center">
-                          <div>
-                            <p className="text-xs font-black text-gray-900 dark:text-white uppercase">{e.title}</p>
-                            <p className="text-[10px] text-gray-500 font-bold">{formatDate(e.event_date)}</p>
-                          </div>
-                          <button className="text-gray-400 hover:text-primary"><Edit2 className="w-4 h-4" /></button>
-                       </div>
-                     ))}
-                  </div>
-               </div>
-            </div>
+        {activeTab === 'engagement' && <SondageModule />}
 
-            <div className="card-glass p-8 space-y-6">
-               <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                 <Compass className="w-4 h-4" />
-                 Guide Touristique & POI
-               </h3>
-               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {locations.filter(l => l.category === 'tourisme' || activeTab === 'social').map(loc => (
-                    <div key={loc.id} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl space-y-3">
-                       <div className="h-32 bg-gray-200 dark:bg-white/10 rounded-xl overflow-hidden">
-                          {loc.image_url && <img src={loc.image_url} alt="" className="w-full h-full object-cover" />}
-                       </div>
-                       <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white truncate">{loc.name}</h4>
-                    </div>
-                  ))}
-               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'engagement' && (
-           <div className="space-y-12 animate-in fade-in duration-700">
-             <div className="flex justify-between items-center">
-               <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase">Sondages & Budget Participatif</h2>
-               <button className="btn-primary">Lancer une Consultation</button>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {budgetProjects.map(proj => (
-                  <div key={proj.id} className="card-glass p-8 space-y-4">
-                     <div className="flex justify-between items-start">
-                        <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">{proj.status}</span>
-                        <span className="text-[10px] font-black text-gray-400">{formatDate(proj.created_at)}</span>
-                     </div>
-                     <h3 className="text-xl font-display font-black text-gray-900 dark:text-white uppercase leading-tight">{proj.title}</h3>
-                     <p className="text-xs text-gray-500 dark:text-gray-400 font-bold leading-relaxed">{proj.description}</p>
-                     <div className="pt-4 border-t border-gray-100 dark:border-white/5 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                           <div className="w-6 h-6 bg-gray-100 rounded-full" />
-                           <span className="text-[10px] font-black text-gray-600 uppercase">{proj.author?.full_name}</span>
-                        </div>
-                        <button className="text-xs font-black text-primary uppercase tracking-widest hover:underline">Voter & Voir</button>
-                     </div>
-                  </div>
-                ))}
-             </div>
-           </div>
-        )}
-
-        {activeTab === 'content' && (
-           <div className="space-y-12 animate-in fade-in duration-700">
-              <h2 className="text-3xl font-display font-black text-gray-900 dark:text-white uppercase">Gestion du Contenu (CMS)</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                 {[
-                   { id: 'history', label: 'Histoire & Vision', icon: Eye },
-                   { id: 'transparency', label: 'Transparence Municipale', icon: ShieldCheck },
-                   { id: 'council', label: 'Conseil Municipal', icon: Users },
-                   { id: 'arrondissements', label: 'Détails Arrondissements', icon: Map },
-                   { id: 'reports', label: 'Rapports & Comptes Rendus', icon: FileText }
-                 ].map(item => (
-                   <button key={item.id} className="card-glass p-10 text-center space-y-6 group hover:border-primary/50 transition-all">
-                      <div className="w-16 h-16 bg-primary/10 rounded-[28px] mx-auto flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                         <item.icon className="w-8 h-8" />
-                      </div>
-                      <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-[0.2em]">{item.label}</h3>
-                      <button className="text-[10px] font-black text-primary uppercase tracking-widest border border-primary/20 px-4 py-2 rounded-xl group-hover:bg-primary group-hover:text-white transition-all">Gérer la page</button>
-                   </button>
-                 ))}
-              </div>
-           </div>
-        )}
+        {activeTab === 'content' && <CMSModule />}
 
         {activeTab === 'config' && (
            <div className="space-y-12 animate-in fade-in duration-700">
@@ -1048,6 +962,7 @@ export const AdminPortal: React.FC = () => {
         {activeTab === 'market' && <MarketModule isAdmin={true} />}
         {activeTab === 'land' && <LandModule isAdmin={true} />}
         {activeTab === 'transport' && <TransportModule isAdmin={true} />}
+        {activeTab === 'arrondissement' && <ArrondissementModule isAdmin={true} />}
         {activeTab === 'users' && (
           <div className="space-y-12 animate-in fade-in duration-700">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">

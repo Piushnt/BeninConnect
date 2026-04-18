@@ -1,61 +1,51 @@
-# 🇧🇯 Bénin Commune Connect
+# 🇧🇯 Bénin Connect - Plateforme e-Administration Multi-Tenant
 
-**Bénin Commune Connect** est une plateforme GovTech de pointe conçue pour transformer la gouvernance locale au Bénin. Elle offre un guichet numérique unique pour les 77 communes, permettant aux citoyens d'accéder aux services publics, de suivre leurs dossiers et de participer à la vie démocratique de leur commune.
+**Bénin Connect** est une plateforme GovTech de pointe conçue pour transformer la gouvernance locale au Bénin. Elle offre un guichet numérique pour les 77 communes, permettant aux citoyens d'accéder aux services publics, de suivre leurs dossiers et de participer à la vie démocratique de leur commune via un portail complet et réactif.
 
-## 🌟 Points Forts
+## 🌟 Fonctionnalités Déployées
 
-- **Multi-tenant Natif** : Une seule plateforme gérant 77 portails communaux isolés et personnalisables.
-- **E-Services Complets** : Digitalisation des actes d'état civil, certificats de résidence, gestion foncière et des marchés.
-- **Espace Citoyen Sécurisé** : Suivi des dossiers en temps réel, coffre-fort numérique et signature électronique d'actes.
-- **IA Souveraine** : Assistant intelligent basé sur la technologie Gemini, alimenté par une base de connaissances officielle.
-- **Portail Admin Full-Responsive** : Console d'administration complète pour la gestion des communes, des services, et de la communication citoyenne.
-- **SEO & Performance** : Optimisation dynamique des métadonnées pour chaque commune (National & Local).
-- **Notifications Multi-canal** : Système d'alerte en temps réel via notifications in-app et push contextuels.
+- **Portail Administration (Dashboard Mairie) Full-Responsive**
+  - **Gestion des Dossiers** : Traitement et signature électronique (PDF officiel) avec génération de QR code.
+  - **Modules Sectoriels** : Régie des marchés, Gestion du Foncier, Service de Transport, Paramétrages des Taux et Fiscalité.
+  - **Communication & Engagement** : Publication des Actualités Locales, Flash Info (bandeaux urgents), Agenda Municipal, Sondages Citoyens et Budgets Participatifs.
+  - **CMS de Mairie** : Éditeur pour la Personnalisation des pages Histoire, Transparence et Conseil Municipal.
+  - **Signalements** : Modération et résolution des alertes émises par les citoyens.
 
-## 🛠️ Stack Technique
+- **Portail Citoyen & E-Services National**
+  - Catalogue National et personnalisation locale de tous les services avec simulateur fiscal inclus.
+  - Suivi des démarches en temps réel avec notifications et coffre-fort numérique sécurisé.
+  - Découverte touristique (carte POI) et engagement citoyen direct.
 
-- **Frontend** : React 18, TypeScript, Vite, Tailwind CSS, Framer Motion.
-- **Backend/Base de données** : Supabase (PostgreSQL, Auth, Storage, Realtime).
-- **IA** : Google Gemini API (@google/genai).
-- **Icônes** : Lucide React.
-- **Animations** : Motion (motion/react).
+- **Infrastructure & Multi-Tenant Natif**
+  - Déploiement unique (SaaS) isolant de façon stricte les données (Row Level Security - RLS) de chaque sous-domaine/commune.
+  - SEO Dynamique (React Helmet) : Chaque page de mairie porte ses propres balises Meta pour le référencement naturel.
 
-## 📂 Structure du Projet
+## 🛠️ Stack Technique & Architecture
 
-- `/src/contexts` : Gestion de l'état global (Auth, Tenant).
-- `/src/pages` : Pages principales (National, Local, Admin, Citoyen).
-- `/src/components` : Composants UI réutilisables.
-- `/schema.sql` : Schéma de base de données complet avec politiques RLS.
-- `/fonctionnalite.md` : Liste détaillée des modules développés.
-- `/TEST_GUIDE.md` : Guide pour tester les différentes fonctionnalités.
+- **Frontend** : React 18, TypeScript, Vite, Tailwind CSS, Framer Motion, React Query, React Helmet Async.
+- **Backend/Data** : Supabase (PostgreSQL, Authentification par Magic Link OTP exclusif, Storage, Realtime).
+- **Assistance IA** : Google Gemini API (Modèle de connaissances Gouvernementales).
 
-## 🚀 Démarrage Rapide
+## 🚀 Démarrage & Déploiement
 
 1. Installez les dépendances : `npm install`
-2. Configurez vos variables d'environnement (Supabase & Gemini).
-3. Initialisez la base de données avec `schema.sql` (Copiez-collez le contenu dans le SQL Editor de Supabase).
-   - **Note importante** : Assurez-vous d'exécuter le script complet pour créer les fonctions de sécurité (`is_staff_for_tenant`, etc.) avant que les politiques RLS ne soient appliquées.
-4. Lancez l'application : `npm run dev`
+2. Configurez vos variables d'environnement (`.env`) contenant les clés Supabase & Gemini.
+3. **Synchronisation Base de données** :
+   - Exécutez le script contenu dans `/schema.sql`. Il est garanti stable et inclut la suppression des contraintes sur le système de Rôles pour éviter les blocages lors de la gestion manuelle depuis la console Supabase (GUI).
+   - Les scripts sont aussi découpés dans `/database/` (`01_tables.sql`, `02_functions_triggers.sql`, `03_rls_policies.sql`) pour une exécution séquentielle ou un diagnostic asynchrone modulaire.
+4. Lancez le serveur local : `npm run dev` ou build pour production : `npm run build`
 
-## 🛠️ Dépannage SQL
+## 👑 Rôles & Accès Sécurisés
 
-Si vous rencontrez l'erreur `function is_staff_for_tenant(uuid) does not exist` :
-- Cela signifie que les fonctions de sécurité n'ont pas été créées correctement.
-- **Solution** : Ré-exécutez le fichier `schema.sql` dans son intégralité. Le fichier a été mis à jour pour définir les fonctions au début du script afin d'éviter les erreurs de dépendance lors de la création des politiques.
-
-## 👑 Administration & Super Admin
-
-Pour accéder au portail d'administration :
-1. **Inscription** : Créez un compte via `/auth/register`. 
-   - **Code PIN Spécial** : Utilisez le code `1234` lors de l'inscription pour obtenir automatiquement le rôle **Admin**.
-2. **Accès aux Dashboards** :
-   - **Admin Local** : `/{votre-commune}/admin-portal` (ex: `/za-kpota/admin-portal`)
-   - **Super Admin** : `/super-admin` (nécessite le rôle `super_admin`)
-3. **Gestion des Rôles** : Vous pouvez modifier manuellement le rôle d'un utilisateur dans la table `user_profiles` de Supabase (`super_admin`, `admin`, `agent`, `citizen`).
+L'utilisation du compte classique d'inscription bascule sur le statut "Citoyen".
+Pour obtenir des privilèges avancés (ex: **Agent**, **Admin** ou **Super Admin**) :
+1. Créez un compte par OTP (Magic Link).
+2. Rendez-vous dans la table `user_profiles` depuis l'interface d'administration de Supabase.
+3. Modifiez directement la colonne `role` du compte cible (Aucune contrainte d'interface stricte n'entravera la modification : le mot `super_admin` peut être inséré à la main).
+4. Le Super Admin peut par la suite inviter et modifier sereinement les rôles depuis le **Dashboard de la Mairie** (`/admin-portal`) via la section Utilisateurs.
 
 ## 🛡️ Sécurité
-
-La plateforme utilise **Row Level Security (RLS)** sur Supabase pour garantir une isolation stricte des données entre les communes et protéger la vie privée des citoyens. Les rôles (`super_admin`, `admin`, `agent`, `citizen`) définissent précisément les permissions d'accès.
+Le codebase a subi un audit garantissant la protection Multi-Tenant, empêchant formellement tout croisement des dossiers. L'accès direct aux requêtes SQL depuis le frontend applicatif pour les fonctions vitales a été migré sur un protocole d'interrogation sécurisée RLS.
 
 ---
-*Bénin Commune Connect - Pour une administration moderne, transparente et proche du citoyen.*
+*Bénin Connect - Le futur de l'administration, du suivi et de la proximité.*

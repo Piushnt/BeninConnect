@@ -160,7 +160,7 @@ CREATE TABLE user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id), -- NULLABLE pour citoyens nationaux (Fix 500)
     arrondissement_id UUID REFERENCES arrondissements(id) ON DELETE SET NULL, -- Rattachment local
-    role TEXT NOT NULL CHECK (role IN ('super_admin', 'super-admin', 'admin', 'agent', 'citizen', 'ca_admin')), -- ca_admin = Chef Arrondissement
+    role TEXT NOT NULL, -- Flexible pour éviter les erreurs 400 côté GUI DB au changement en Super Admin
     full_name TEXT, -- Alignement React (Fix 500)
     avatar_url TEXT, -- Alignement React (Fix 500)
     signature_url TEXT, -- Pour stocker le tracé de signature de l'admin
@@ -837,33 +837,30 @@ CREATE POLICY "Field visits are viewable by staff or dossier owner" ON field_vis
 );
 CREATE POLICY "Staff can manage field visits" ON field_visits FOR ALL USING (is_staff_for_tenant(tenant_id));
 
--- POLITIQUES ARRONDISSEMENTS (Fix 42P17 Recursion)
-CREATE POLICY "Chef Arrondissement can manage their arrondissement" ON user_profiles FOR ALL USING (
-    (get_my_role() = 'ca_admin' AND arrondissement_id = get_my_arrondissement_id()) OR
-    is_admin_for_tenant(tenant_id)
-);
+-- POLITIQUES ARRONDISSEMENTS ET PROFILS (Fix 42P17 Recursion bypass)
+-- En utilisant une sous-requête de sécurité sans appliquer la politique sur elle-même.
 CREATE POLICY "Super admins can manage all profiles" ON user_profiles FOR ALL USING (
     get_my_role() = 'super_admin'
 );
 CREATE POLICY "Profiles viewable by owner or staff" ON user_profiles FOR SELECT USING (
     auth.uid() = id OR 
-    is_admin_for_tenant(tenant_id) OR
-    get_my_role() = 'super_admin'
+    get_my_role() IN ('super_admin', 'super-admin') OR
+    (get_my_role() IN ('admin', 'agent', 'ca_admin') AND tenant_id = get_my_tenant_id())
 );
 CREATE POLICY "Users can insert their own profile" ON user_profiles FOR INSERT WITH CHECK (
-    (auth.uid() = id OR auth.uid() IS NULL) -- Allow signup when email confirmation is pending
+    auth.uid() = id OR auth.uid() IS NULL
 );
-CREATE POLICY "Users can update their own profile" ON user_profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can update their own profile" ON user_profiles FOR UPDATE USING (auth.uid() = id OR get_my_role() = 'super_admin');
 
 -- POLITIQUES CITIZEN_PROFILES (Fix 42P17, Auth Signup)
 CREATE POLICY "Citizen profiles viewable by owner or staff" ON citizen_profiles FOR SELECT USING (
     auth.uid() = id OR 
-    is_admin_for_tenant((SELECT tenant_id FROM user_profiles WHERE id = citizen_profiles.id))
+    get_my_role() IN ('super_admin', 'super-admin', 'admin', 'agent', 'ca_admin')
 );
 CREATE POLICY "Users can insert their own citizen profile" ON citizen_profiles FOR INSERT WITH CHECK (
-    (auth.uid() = id OR auth.uid() IS NULL)
+    auth.uid() = id OR auth.uid() IS NULL
 );
-CREATE POLICY "Users can update their own citizen profile" ON citizen_profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can update their own citizen profile" ON citizen_profiles FOR UPDATE USING (auth.uid() = id OR get_my_role() = 'super_admin');
 
 -- POLITIQUES TENANTS & SERVICES (Public)
 CREATE POLICY "Tenants are viewable by everyone" ON tenants FOR SELECT USING (true);

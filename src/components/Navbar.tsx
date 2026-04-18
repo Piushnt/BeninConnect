@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useTenant } from '../contexts/TenantContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,6 +19,13 @@ export const Navbar: React.FC = () => {
   const { slug } = useParams();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCivilRegistryEnabled, setIsCivilRegistryEnabled] = useState(false);
+  const location = useLocation();
+
+  // Mode Administration (Cache les menus superflus pour éviter la superposition)
+  const isAdminView = location.pathname.includes('/admin-portal') || 
+                      location.pathname.includes('/super-admin') || 
+                      location.pathname.includes('/ministere') ||
+                      location.pathname.includes('/system-setup');
 
   useEffect(() => {
     if (tenant) {
@@ -146,55 +153,57 @@ export const Navbar: React.FC = () => {
               </Link>
             </div>
 
-            {/* Navigation Links */}
-            <div className="hidden lg:flex items-center space-x-4 xl:space-x-6">
-              {links.map((link) => (
-                <div 
-                  key={link.label} 
-                  className="relative group h-full flex items-center"
-                  onMouseEnter={() => setActiveDropdown(link.label)}
-                  onMouseLeave={() => setActiveDropdown(null)}
-                >
-                  {link.path ? (
-                    <Link 
-                      to={link.path} 
-                      className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-green-400 transition-colors relative"
-                    >
-                      {link.label}
-                      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#EBB700] transition-all group-hover:w-full" />
-                    </Link>
-                  ) : (
-                    <button className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-green-400 transition-colors relative flex items-center gap-1">
-                      {link.label}
-                      <ChevronRight className={cn("w-3 h-3 transition-transform", activeDropdown === link.label ? "rotate-90" : "")} />
-                      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#EBB700] transition-all group-hover:w-full" />
-                    </button>
-                  )}
-
-                  {/* Dropdown */}
-                  <AnimatePresence>
-                    {link.children && activeDropdown === link.label && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute top-full left-0 w-60 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-3 grid gap-1"
+            {/* Navigation Links (Hidden in Admin Views) */}
+            {!isAdminView && (
+              <div className="hidden lg:flex items-center space-x-4 xl:space-x-6">
+                {links.map((link) => (
+                  <div 
+                    key={link.label} 
+                    className="relative group h-full flex items-center"
+                    onMouseEnter={() => setActiveDropdown(link.label)}
+                    onMouseLeave={() => setActiveDropdown(null)}
+                  >
+                    {link.path ? (
+                      <Link 
+                        to={link.path} 
+                        className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-green-400 transition-colors relative"
                       >
-                        {link.children.map((child) => (
-                          <Link
-                            key={child.label}
-                            to={child.path}
-                            className="px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-800 hover:text-green-400 transition-all"
-                          >
-                            {child.label}
-                          </Link>
-                        ))}
-                      </motion.div>
+                        {link.label}
+                        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#EBB700] transition-all group-hover:w-full" />
+                      </Link>
+                    ) : (
+                      <button className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-green-400 transition-colors relative flex items-center gap-1">
+                        {link.label}
+                        <ChevronRight className={cn("w-3 h-3 transition-transform", activeDropdown === link.label ? "rotate-90" : "")} />
+                        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#EBB700] transition-all group-hover:w-full" />
+                      </button>
                     )}
-                  </AnimatePresence>
-                </div>
-              ))}
-            </div>
+
+                    {/* Dropdown */}
+                    <AnimatePresence>
+                      {link.children && activeDropdown === link.label && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="absolute top-full left-0 w-60 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-3 grid gap-1"
+                        >
+                          {link.children.map((child) => (
+                            <Link
+                              key={child.label}
+                              to={child.path}
+                              className="px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-800 hover:text-green-400 transition-all"
+                            >
+                              {child.label}
+                            </Link>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -233,12 +242,15 @@ export const Navbar: React.FC = () => {
                 </Link>
               )}
 
-              <button 
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="lg:hidden p-2 text-gray-400 hover:bg-gray-800 rounded-xl transition-all"
-              >
-                {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
+              {/* Mobile Menu Button - Hidden if Admin View to avoid Sidebar conflict */}
+              {!isAdminView && (
+                <button 
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="lg:hidden p-2 text-gray-400 hover:bg-gray-800 rounded-xl transition-all"
+                >
+                  {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
+              )}
             </div>
           </div>
         </div>

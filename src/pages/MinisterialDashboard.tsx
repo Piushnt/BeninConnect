@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { motion } from 'motion/react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart3, 
   Users, 
@@ -19,7 +20,9 @@ import {
   ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
-  LayoutDashboard
+  LayoutDashboard,
+  Settings,
+  Bell
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 import { Pagination } from '../components/Pagination';
@@ -39,130 +42,116 @@ import {
 } from 'recharts';
 
 export const MinisterialDashboard: React.FC = () => {
-  const [stats, setStats] = useState({
-    totalTenants: 0,
-    totalUsers: 0,
-    totalDossiers: 0,
-    totalRevenue: 0,
-    activeServices: 0,
-    pendingSignalements: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [tenants, setTenants] = useState<any[]>([]);
-  const [recentDossiers, setRecentDossiers] = useState<any[]>([]);
-  const [dossierStats, setDossierStats] = useState<any[]>([]);
-  const [revenueStats, setRevenueStats] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('overview');
+  const queryClient = useQueryClient();
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalItems, setTotalItems] = useState(0);
-
-  useEffect(() => {
-    fetchNationalData();
-  }, [currentPage, pageSize]);
-
-  const fetchNationalData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch stats
-      const [
-        tenantsRes, 
-        usersRes, 
-        dossiersRes, 
-        paymentsRes, 
-        servicesRes,
-        signalementsRes
-      ] = await Promise.all([
-        supabase.from('tenants').select('*', { count: 'exact' }),
-        supabase.from('user_profiles').select('*', { count: 'exact' }),
-        supabase.from('dossiers').select('*', { count: 'exact' }),
+  const { data: qNationalData, isLoading: loadingOverview } = useQuery({
+    queryKey: ['national_overview', currentPage, pageSize],
+    queryFn: async () => {
+      const [tenantsRes, usersRes, dossiersRes, paymentsRes, servicesRes, signalementsRes, tenantsListRes, dossiersListRes] = await Promise.all([
+        supabase.from('tenants').select('*', { count: 'exact', head: true }),
+        supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('dossiers').select('*', { count: 'exact', head: true }),
         supabase.from('payments').select('amount').eq('status', 'success'),
-        supabase.from('public_services').select('*', { count: 'exact' }).eq('is_active', true),
-        supabase.from('signalements').select('*', { count: 'exact' }).eq('status', 'pending')
+        supabase.from('public_services').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('signalements').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('tenants').select('*, department:departments(name)', { count: 'exact' }).order('name').range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
+        supabase.from('dossiers').select('*, tenant:tenants(name), citizen:user_profiles(full_name)').order('created_at', { ascending: false }).limit(5)
       ]);
 
       const totalRevenue = (paymentsRes.data || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
+      return {
+        stats: {
+          totalTenants: tenantsRes.count || 0,
+          totalUsers: usersRes.count || 0,
+          totalDossiers: dossiersRes.count || 0,
+          totalRevenue,
+          activeServices: servicesRes.count || 0,
+          pendingSignalements: signalementsRes.count || 0
+        },
+        tenants: tenantsListRes.data || [],
+        tenantsCount: tenantsListRes.count || 0,
+        recentDossiers: dossiersListRes.data || []
+      };
+    },
+    enabled: activeTab === 'overview'
+  });
 
-      setStats({
-        totalTenants: tenantsRes.count || 0,
-        totalUsers: usersRes.count || 0,
-        totalDossiers: dossiersRes.count || 0,
-        totalRevenue,
-        activeServices: servicesRes.count || 0,
-        pendingSignalements: signalementsRes.count || 0
-      });
+  const { data: qServices, isLoading: loadingServices } = useQuery({
+    queryKey: ['national_services'],
+    queryFn: async () => {
+      const res = await supabase.from('public_services').select('*').order('category').order('name');
+      return res.data || [];
+    },
+    enabled: activeTab === 'services'
+  });
 
-      // Fetch tenants with their stats
-      const { data: tenantsData, count: tenantsCount } = await supabase
-        .from('tenants')
-        .select('*, department:departments(name)', { count: 'exact' })
-        .order('name')
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-      
-      setTenants(tenantsData || []);
-      setTotalItems(tenantsCount || 0);
+  const { data: qAlerts, isLoading: loadingAlerts } = useQuery({
+    queryKey: ['national_alerts'],
+    queryFn: async () => {
+      const res = await supabase.from('signalements').select('*, tenant:tenants(name), citizen:user_profiles(full_name)').order('created_at', { ascending: false });
+      return res.data || [];
+    },
+    enabled: activeTab === 'alerts'
+  });
 
-      // Fetch recent dossiers
-      const { data: dossiersData } = await supabase
-        .from('dossiers')
-        .select('*, tenant:tenants(name), citizen:user_profiles(full_name)')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      setRecentDossiers(dossiersData || []);
-
-      // Fetch chart data
+  const generateChartData = async () => {
+    try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
       const [dossiersChartRes, paymentsChartRes] = await Promise.all([
-        supabase
-          .from('dossiers')
-          .select('created_at')
-          .gte('created_at', sixMonthsAgo.toISOString()),
-        supabase
-          .from('payments')
-          .select('amount, created_at')
-          .eq('status', 'success')
-          .gte('created_at', sixMonthsAgo.toISOString())
+        supabase.from('dossiers').select('created_at').gte('created_at', sixMonthsAgo.toISOString()),
+        supabase.from('payments').select('amount, created_at').eq('status', 'success').gte('created_at', sixMonthsAgo.toISOString())
       ]);
-
-      // Process dossier stats
       const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
       const last6Months = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
-        last6Months.push({
-          name: months[d.getMonth()],
-          month: d.getMonth(),
-          year: d.getFullYear(),
-          value: 0,
-          revenue: 0
-        });
+        last6Months.push({ name: months[d.getMonth()], month: d.getMonth(), year: d.getFullYear(), value: 0, revenue: 0 });
       }
-
       dossiersChartRes.data?.forEach(d => {
         const date = new Date(d.created_at);
-        const monthData = last6Months.find(m => m.month === date.getMonth() && m.year === date.getFullYear());
-        if (monthData) monthData.value++;
+        const mData = last6Months.find(m => m.month === date.getMonth() && m.year === date.getFullYear());
+        if (mData) mData.value++;
       });
-
       paymentsChartRes.data?.forEach(p => {
         const date = new Date(p.created_at);
-        const monthData = last6Months.find(m => m.month === date.getMonth() && m.year === date.getFullYear());
-        if (monthData) monthData.revenue += Number(p.amount);
+        const mData = last6Months.find(m => m.month === date.getMonth() && m.year === date.getFullYear());
+        if (mData) mData.revenue += Number(p.amount);
       });
-
       setDossierStats(last6Months.map(m => ({ name: m.name, value: m.value })));
       setRevenueStats(last6Months.map(m => ({ name: m.name, value: m.revenue })));
-
-    } catch (err) {
-      console.error('Error fetching national data:', err);
-    } finally {
-      setLoading(false);
+    } catch(err) {
+      console.error(err);
     }
   };
+
+  useEffect(() => {
+    generateChartData();
+  }, []);
+
+  const toggleNationalService = async (serviceId: string, currentState: boolean) => {
+    try {
+      const { error } = await supabase.from('public_services').update({ is_active: !currentState }).eq('id', serviceId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['national_services'] });
+    } catch(err) { alert('Error: ' + err); }
+  };
+
+  const moderateAlert = async (alertId: string, status: string) => {
+    try {
+      const { error } = await supabase.from('signalements').update({ status }).eq('id', alertId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['national_alerts'] });
+    } catch(err) { alert('Error: ' + err); }
+  };
+
+  const currentStats = qNationalData?.stats || stats;
+  const currentTenants = qNationalData?.tenants || [];
+  const currentTenantsCount = qNationalData?.tenantsCount || 0;
+  const recentOverviewDossiers = qNationalData?.recentDossiers || [];
+
 
   const COLORS = ['#008751', '#EBB700', '#E30613', '#004d2c', '#1a1a1a'];
 
@@ -195,13 +184,36 @@ export const MinisterialDashboard: React.FC = () => {
           </div>
         </header>
 
-        {/* Key Metrics - Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Tabs */}
+        <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-[20px] max-w-fit shadow-inner">
           {[
-            { label: 'Communes Déployées', value: stats.totalTenants, icon: Building2, trend: '+2 ce mois', color: 'from-blue-500 to-cyan-400' },
-            { label: 'Citoyens Connectés', value: stats.totalUsers.toLocaleString(), icon: Users, trend: '+12% vs mai', color: 'from-emerald-500 to-teal-400' },
-            { label: 'Dossiers Traités', value: stats.totalDossiers.toLocaleString(), icon: FileText, trend: '+5.4k aujourd\'hui', color: 'from-purple-500 to-indigo-400' },
-            { label: 'Recettes Globales', value: `${stats.totalRevenue.toLocaleString()} FCFA`, icon: TrendingUp, trend: '+8% vs Q1', color: 'from-amber-500 to-orange-400' },
+            { id: 'overview', label: 'Vue Globale', icon: LayoutDashboard },
+            { id: 'services', label: 'Services Nationaux', icon: Settings },
+            { id: 'alerts', label: 'Observatoire des Alertes', icon: Bell },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all relative z-10",
+                activeTab === tab.id ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-xl" : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+              )}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'overview' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+            {/* Key Metrics - Bento Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+            { label: 'Communes Déployées', value: currentStats.totalTenants, icon: Building2, trend: '+2 ce mois', color: 'from-blue-500 to-cyan-400' },
+            { label: 'Citoyens Connectés', value: currentStats.totalUsers.toLocaleString(), icon: Users, trend: '+12% vs mai', color: 'from-emerald-500 to-teal-400' },
+            { label: 'Dossiers Traités', value: currentStats.totalDossiers.toLocaleString(), icon: FileText, trend: '+5.4k aujourd\'hui', color: 'from-purple-500 to-indigo-400' },
+            { label: 'Recettes Globales', value: `${currentStats.totalRevenue.toLocaleString()} FCFA`, icon: TrendingUp, trend: '+8% vs Q1', color: 'from-amber-500 to-orange-400' },
           ].map((metric, i) => (
             <motion.div
               key={i}
@@ -351,7 +363,9 @@ export const MinisterialDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                  {tenants.map((t) => (
+                  {loadingOverview ? (
+                    [1,2,3].map(i => <tr key={i}><td colSpan={5} className="px-6 py-6 bg-gray-50/50 animate-pulse" /></tr>)
+                  ) : currentTenants.map((t: any) => (
                     <tr key={t.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
@@ -390,7 +404,7 @@ export const MinisterialDashboard: React.FC = () => {
               </table>
             </div>
             <Pagination 
-              total={totalItems} 
+              total={currentTenantsCount} 
               current={currentPage} 
               pageSize={pageSize}
               onChange={setCurrentPage}
@@ -402,7 +416,7 @@ export const MinisterialDashboard: React.FC = () => {
           <div className="bento-card p-6 md:p-8 flex flex-col">
             <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-8">Derniers Dossiers</h3>
             <div className="space-y-6 flex-grow">
-              {recentDossiers.map((d, i) => (
+              {recentOverviewDossiers.map((d: any, i: number) => (
                 <div key={d.id} className="flex gap-4 group">
                   <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-400 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-500/10 group-hover:text-emerald-500 transition-all shrink-0 border border-gray-100 dark:border-white/5">
                     <FileText className="w-5 h-5" />
@@ -434,31 +448,110 @@ export const MinisterialDashboard: React.FC = () => {
             </button>
           </div>
         </div>
+          </motion.div>
+        )}
 
-        {/* System Health */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { label: 'Disponibilité API', value: '99.98%', icon: Globe, status: 'Optimal' },
-            { label: 'Temps de Réponse', value: '124ms', icon: Clock, status: 'Stable' },
-            { label: 'Alertes Système', value: '0', icon: AlertTriangle, status: 'Aucune' },
-          ].map((item, i) => (
-            <div key={i} className="bento-card p-6 flex items-center gap-5">
-              <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-400 border border-gray-100 dark:border-white/5">
-                <item.icon className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">{item.label}</p>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl font-display font-bold text-gray-900 dark:text-white">{item.value}</span>
-                  <span className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                    {item.status}
-                  </span>
+        {/* Tab Services */}
+        {activeTab === 'services' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bento-card overflow-hidden">
+            <div className="p-8 border-b border-gray-100 dark:border-white/5">
+              <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white">Catalogue National des Services Publics</h3>
+              <p className="text-gray-500 uppercase tracking-widest text-[10px] font-bold mt-1">Activation/Désactivation à l'échelle du territoire</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50/50 dark:bg-white/5">
+                  <tr>
+                    <th className="px-8 py-4 text-left text-[10px] uppercase font-bold text-gray-500">Service</th>
+                    <th className="px-8 py-4 text-left text-[10px] uppercase font-bold text-gray-500">Catégorie</th>
+                    <th className="px-8 py-4 text-left text-[10px] uppercase font-bold text-gray-500">Tarif Modèle</th>
+                    <th className="px-8 py-4 text-left text-[10px] uppercase font-bold text-gray-500">Statut National</th>
+                    <th className="px-8 py-4 text-right text-[10px] uppercase font-bold text-gray-500">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                  {loadingServices ? (
+                    <tr><td colSpan={5} className="px-8 py-6 bg-gray-50/50 animate-pulse text-center">Chargement...</td></tr>
+                  ) : (
+                    qServices?.map((s: any) => (
+                      <tr key={s.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
+                        <td className="px-8 py-4 text-sm font-bold text-gray-900 dark:text-white">{s.name}</td>
+                        <td className="px-8 py-4 text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">{s.category}</td>
+                        <td className="px-8 py-4 text-xs font-mono dark:text-white">{s.base_price} FCFA</td>
+                        <td className="px-8 py-4">
+                          <span className={cn("px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest", s.is_active ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600")}>
+                            {s.is_active ? 'Actif' : 'Coupé'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4 text-right">
+                          <button 
+                            onClick={() => toggleNationalService(s.id, s.is_active)}
+                            className={cn("px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all text-white", s.is_active ? "bg-red-500 hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-600")}
+                          >
+                            {s.is_active ? 'Suspendre' : 'Activer'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
 
-                </div>
+        {/* Tab Alertes */}
+        {activeTab === 'alerts' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bento-card p-6 border-l-4 border-l-amber-500">
+                <h4 className="text-[10px] uppercase font-bold text-gray-500">Alertes Actives</h4>
+                <p className="text-3xl font-display font-bold text-gray-900 dark:text-white mt-2">{qAlerts?.filter((a: any) => a.status === 'pending').length || 0}</p>
               </div>
             </div>
-          ))}
-        </div>
+
+            <div className="bento-card overflow-hidden">
+              <div className="p-8 border-b border-gray-100 dark:border-white/5">
+                <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white">Observatoire National des Alertes</h3>
+              </div>
+              <div className="p-4 grid gap-4">
+                {loadingAlerts ? (
+                  <div className="p-8 text-center text-gray-500 animate-pulse">Scan en cours...</div>
+                ) : qAlerts?.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">Aucune alerte civique sur le territoire.</div>
+                ) : (
+                  qAlerts?.map((alert: any) => (
+                    <div key={alert.id} className="flex flex-col md:flex-row gap-6 p-6 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5">
+                      {alert.image_url && (
+                        <img src={alert.image_url} alt="" className="w-full md:w-48 h-32 object-cover rounded-xl shrink-0" />
+                      )}
+                      <div className="flex-grow">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-bold text-gray-900 dark:text-white text-lg">{alert.title}</h4>
+                          <span className={cn("px-3 py-1 rounded-full text-[10px] font-bold uppercase", alert.status === 'resolved' ? "bg-emerald-50 text-emerald-600" : alert.status === 'rejected' ? "bg-gray-200 text-gray-600" : "bg-amber-50 text-amber-600")}>
+                            {alert.status}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-4">{alert.description}</p>
+                        <div className="flex items-center gap-4 text-xs font-medium text-gray-400">
+                          <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> {alert.tenant?.name}</span>
+                          <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {alert.citizen?.full_name}</span>
+                        </div>
+                        {alert.status === 'pending' && (
+                          <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
+                            <button onClick={() => moderateAlert(alert.id, 'resolved')} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">Prendre en charge</button>
+                            <button onClick={() => moderateAlert(alert.id, 'rejected')} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">Rejeter</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
       </div>
     </div>
   );

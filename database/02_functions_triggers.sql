@@ -93,3 +93,38 @@ BEGIN
     WHERE id = auth.uid();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Fonction pour gérer la création sécurisée d'un profil administrateur par un Super Admin (RPC)
+CREATE OR REPLACE FUNCTION create_admin_user(
+  admin_email TEXT,
+  admin_fullname TEXT,
+  admin_role TEXT,
+  target_tenant_id UUID DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  new_user_id UUID;
+BEGIN
+  -- Seuls les super admins peuvent créer d'autres admins via cette fonction (Double vérification)
+  IF NOT EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('super_admin', 'super-admin')) THEN
+     RAISE EXCEPTION 'Non autorisé: Seul un Super Admin peut inviter des administrateurs.';
+  END IF;
+
+  -- Création impossible de l'auth.user via RPC sans pgcrypto ou API Supabase admin
+  -- DONC cette fonction sert plutôt si l'utilisateur a DÉJÀ signé avec OTP/Magic Link, ou créer une invitation table ?
+  -- Puisque supabase auth.users n'est pas insérable directement via RPC facilement, 
+  -- L'approche standard est de stocker l'invitation et le client Supabase Auth Admin le crée, 
+  -- OU on fait juste une mise à jour d'un compte citoyen existant.
+  
+  -- Si l'email est déjà dans auth.users: on modifie le rôle.
+  SELECT id INTO new_user_id FROM auth.users WHERE email = admin_email;
+  
+  IF new_user_id IS NOT NULL THEN
+     UPDATE user_profiles SET role = admin_role, tenant_id = target_tenant_id, full_name = admin_fullname WHERE id = new_user_id;
+     RETURN new_user_id;
+  ELSE
+     -- Si l'utilisateur n'existe pas encore, on crée une "invitation pending"
+     -- Dans ce système, l'invitation n'est pas native via RPC. On lance une erreur gérée avec instruction.
+     RAISE EXCEPTION 'Utilisateur introuvable. Le futur admin doit d''abord se connecter une fois (Magic Link) pour que son profil soit créé.';
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

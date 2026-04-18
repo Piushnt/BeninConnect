@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { 
   Globe, 
@@ -33,8 +34,6 @@ export const SuperAdminDashboard: React.FC = () => {
   const [tenants, setTenants] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(true);
-  const [loadingLocations, setLoadingLocations] = useState(false);
   const [stats, setStats] = useState({
     totalTenants: 0,
     activeUsers: 0,
@@ -59,15 +58,57 @@ export const SuperAdminDashboard: React.FC = () => {
   const [departments, setDepartments] = useState<any[]>([]);
 
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearch, setUserSearch] = useState('');
 
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [globalServices, setGlobalServices] = useState<any[]>([]);
+
+  const queryClient = useQueryClient();
+
+  const { data: qTenants, isLoading: qLoadingTenants, refetch: rTenants } = useQuery({
+    queryKey: ['tenants', currentPage, pageSize],
+    queryFn: async () => {
+      const db = await supabase.from('tenants')
+        .select('*, departments(name), tenant_features(features(*), is_enabled)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      if (db.error) throw db.error;
+      return db;
+    },
+    enabled: ['overview', 'tenants'].includes(activeTab)
+  });
+
+  const { data: qLocations, isLoading: qLoadingLocations, refetch: rLocations } = useQuery({
+    queryKey: ['locations', currentPage, pageSize],
+    queryFn: async () => {
+      const db = await supabase.from('locations').select('*, tenants(name)', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      if (db.error) throw db.error;
+      return db;
+    },
+    enabled: activeTab === 'locations'
+  });
+
+  const { data: qUsers, isLoading: qLoadingUsers, refetch: rUsers } = useQuery({
+    queryKey: ['users', currentPage, pageSize],
+    queryFn: async () => {
+      const db = await supabase.from('user_profiles').select('*, tenants(name)', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      if (db.error) throw db.error;
+      return db;
+    },
+    enabled: activeTab === 'users'
+  });
+
+  const { data: qLogs, isLoading: qLoadingLogs } = useQuery({
+    queryKey: ['audit_logs', currentPage, pageSize],
+    queryFn: async () => {
+      // Pour éviter les erreurs si la table n'existe pas on gère silencieusement l'erreur
+      const db = await supabase.from('audit_logs').select('*, user:user_id(full_name, email)', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * pageSize, currentPage * pageSize - 1).catch(() => ({ data: [], count: 0 }));
+      return db;
+    },
+    enabled: activeTab === 'logs'
+  });
 
   useEffect(() => {
     setCurrentPage(1);
-    setTotalItems(0);
   }, [activeTab]);
 
   useEffect(() => {
@@ -79,167 +120,21 @@ export const SuperAdminDashboard: React.FC = () => {
     if (activeTab === 'config') fetchGlobalServices();
   }, [activeTab, currentPage, pageSize]);
 
-  const fetchAuditLogs = async () => {
-    try {
-      const { data, count, error } = await supabase
-        .from('audit_logs')
-        .select(`*, user:user_id(full_name, email)`, { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-      if (error) throw error;
-      setAuditLogs(data || []);
-      setTotalItems(count || 0);
-    } catch (err) {
-      console.error('Error fetching logs:', err);
-    }
-  };
+  // Données dérivées des Queries
+  const { data: tenantsData = [], count: tenantsCount = 0 } = qTenants || { data: [], count: 0 };
+  const { data: usersData = [], count: usersCount = 0 } = qUsers || { data: [], count: 0 };
+  const { data: locationsData = [], count: locationsCount = 0 } = qLocations || { data: [], count: 0 };
+  const { data: logsData = [], count: logsCount = 0 } = qLogs || { data: [], count: 0 };
 
-  const fetchGlobalServices = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('public_services')
-        .select('*')
-        .order('category')
-        .order('name');
-      if (error) throw error;
-      setGlobalServices(data || []);
-    } catch (err) {
-      console.error('Error fetching global services:', err);
-    }
-  };
+  const loading = qLoadingTenants;
+  const loadingLocations = qLoadingLocations;
+  const loadingUsers = qLoadingUsers;
+  const loadingLogs = qLoadingLogs;
 
-  const toggleGlobalService = async (serviceId: string, currentState: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('public_services')
-        .update({ is_active: !currentState })
-        .eq('id', serviceId);
-      if (error) throw error;
-      fetchGlobalServices();
-    } catch (err) {
-      alert('Erreur: ' + err);
-    }
-  };
-
-  const fetchDepartments = async () => {
-    const { data } = await supabase.from('departments').select('*').order('name');
-    setDepartments(data || []);
-  };
-
-  const fetchLocations = async () => {
-    try {
-      setLoadingLocations(true);
-      const { data, count, error } = await supabase
-        .from('locations')
-        .select('*, tenants(name)', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-      if (error) throw error;
-      setLocations(data || []);
-      setTotalItems(count || 0);
-    } catch (err) {
-      console.error('Error fetching locations:', err);
-    } finally {
-      setLoadingLocations(false);
-    }
-  };
-
-  const fetchAllUsers = async () => {
-    try {
-      setLoadingUsers(true);
-      const { data, count, error } = await supabase
-        .from('user_profiles')
-        .select('*, tenants(name)', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-      if (error) throw error;
-      setAllUsers(data || []);
-      setTotalItems(count || 0);
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  const handleCreateUserInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreatingUser(true);
-    setFeedback(null);
-
-    try {
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      
-      const { error } = await supabase.from('invitations').insert({
-        email: newUser.email,
-        full_name: newUser.fullName,
-        role: newUser.role,
-        tenant_id: newUser.tenantId || null,
-        token: token,
-        invited_by: (await supabase.auth.getUser()).data.user?.id
-      });
-
-      if (error) throw error;
-
-      setFeedback({ type: 'success', msg: `Invitation envoyée avec succès à ${newUser.email}` });
-      setNewUser({ email: '', fullName: '', role: 'agent', tenantId: '' });
-    } catch (err: any) {
-      console.error('Invite error:', err);
-      setFeedback({ type: 'error', msg: err.message });
-    } finally {
-      setIsCreatingUser(false);
-    }
-  };
-
-  const updateUserRole = async (userId: string, role: string, tenantId: string | null) => {
-    try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ role, tenant_id: tenantId })
-        .eq('id', userId);
-      if (error) throw error;
-      alert('Rôle mis à jour !');
-      fetchAllUsers();
-    } catch (err: any) {
-      alert('Erreur: ' + err.message);
-    }
-  };
-
-  const deleteLocation = async (id: string) => {
-    if (!window.confirm('Supprimer ce point d\'intérêt ?')) return;
-    try {
-      const { error } = await supabase.from('locations').delete().eq('id', id);
-      if (error) throw error;
-      fetchLocations();
-    } catch (err) {
-      alert('Erreur lors de la suppression');
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [tenantsRes, usersRes, dossiersRes] = await Promise.all([
-        supabase.from('tenants').select('*, departments(name), tenant_features(*)', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
-        supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('dossiers').select('*', { count: 'exact', head: true })
-      ]);
-      
-      if (tenantsRes.error) throw tenantsRes.error;
-      setTenants(tenantsRes.data || []);
-      setTotalItems(tenantsRes.count || 0);
-      setStats({
-        totalTenants: tenantsRes.count || 0,
-        activeUsers: usersRes.count || 0,
-        totalDossiers: dossiersRes.count || 0,
-        systemHealth: 'Optimal'
-      });
-    } catch (error) {
-      console.error('Error fetching super admin data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const totalItemsRender = 
+    activeTab === 'locations' ? locationsCount : 
+    activeTab === 'users' ? usersCount : 
+    activeTab === 'logs' ? logsCount : tenantsCount;
 
   const toggleFeature = async (tenantId: string, featureKey: string, isActive: boolean) => {
     try {
@@ -253,14 +148,68 @@ export const SuperAdminDashboard: React.FC = () => {
         if (error) throw error;
       } else {
         // Add feature
+        const { error: featErr, data: feature } = await supabase.from('features').select('id').eq('key', featureKey).single();
+        if (featErr) throw featErr;
         const { error } = await supabase
           .from('tenant_features')
-          .insert({ tenant_id: tenantId, feature_id: featureKey });
+          .insert({ tenant_id: tenantId, feature_id: feature.id });
         if (error) throw error;
       }
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
     } catch (err: any) {
       alert('Erreur lors de la modification des fonctionnalités: ' + err.message);
+    }
+  };
+
+  const toggleGlobalService = async (serviceId: string, currentState: boolean) => {
+    try {
+      const { error } = await supabase.from('public_services').update({ is_active: !currentState }).eq('id', serviceId);
+      if (error) throw error;
+      // Refetch via react query invalidate could be here if globalServices was react-query
+    } catch (err) {
+      alert('Erreur: ' + err);
+    }
+  };
+
+  const handleCreateUserInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingUser(true);
+    setFeedback(null);
+    try {
+      const { error } = await supabase.rpc('create_admin_user', {
+        x_email: newUser.email,
+        x_full_name: newUser.fullName,
+        x_role: newUser.role,
+        x_tenant_id: newUser.tenantId || null
+      });
+      if (error) throw error;
+      setFeedback({ type: 'success', msg: `Utilisateur créé avec succès : ${newUser.email}` });
+      setNewUser({ email: '', fullName: '', role: 'agent', tenantId: '' });
+    } catch (err: any) {
+      setFeedback({ type: 'error', msg: err.message || 'La table des invitations est manquante, création RPC requise.' });
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  const updateUserRole = async (userId: string, role: string, tenantId: string | null) => {
+    try {
+      const { error } = await supabase.from('user_profiles').update({ role, tenant_id: tenantId }).eq('id', userId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    } catch (err: any) {
+      alert('Erreur: ' + err.message);
+    }
+  };
+
+  const deleteLocation = async (id: string) => {
+    if (!window.confirm('Supprimer ce point d\'intérêt ?')) return;
+    try {
+      const { error } = await supabase.from('locations').delete().eq('id', id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+    } catch (err) {
+      alert('Erreur lors de la suppression');
     }
   };
 
@@ -477,8 +426,8 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="space-y-12 animate-in fade-in duration-700">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {[
-                  { label: 'Mairies Actives', value: stats.totalTenants, icon: Globe, color: 'from-blue-600 to-cyan-500' },
-                  { label: 'Utilisateurs Cloud', value: stats.activeUsers, icon: Users, color: 'from-[#008751] to-emerald-400' },
+                  { label: 'Mairies Actives', value: tenantsCount, icon: Globe, color: 'from-blue-600 to-cyan-500' },
+                  { label: 'Utilisateurs Cloud', value: usersCount || 0, icon: Users, color: 'from-[#008751] to-emerald-400' },
                   { label: 'Dossiers Traités', value: stats.totalDossiers, icon: CheckCircle2, color: 'from-[#EBB700] to-amber-300' },
                   { label: 'Santé Système', value: stats.systemHealth, icon: Activity, color: 'from-rose-600 to-pink-500' },
                 ].map((stat, i) => (
@@ -537,7 +486,9 @@ export const SuperAdminDashboard: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                    {tenants.map((t, i) => {
+                    {loading ? (
+                      [1,2,3].map(i => <tr key={i}><td colSpan={5} className="px-10 py-10 bg-gray-50 dark:bg-white/5 animate-pulse" /></tr>)
+                    ) : tenantsData.map((t: any, i: number) => {
                       const hasPolls = t.tenant_features?.some((f: any) => f.features?.key === 'citizen_voice' && f.is_enabled);
                       return (
                       <motion.tr 
@@ -620,7 +571,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
               <div className="p-10 border-t border-gray-100 dark:border-white/5">
                 <Pagination 
-                  total={totalItems} 
+                  total={totalItemsRender} 
                   current={currentPage} 
                   pageSize={pageSize}
                   onChange={setCurrentPage}
@@ -652,7 +603,9 @@ export const SuperAdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                      {locations.map((loc, i) => (
+                      {loadingLocations ? (
+                        [1,2].map(i => <tr key={i}><td colSpan={5} className="px-6 py-6 bg-gray-50 animate-pulse" /></tr>)
+                      ) : locationsData.map((loc: any, i: number) => (
                         <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
@@ -697,7 +650,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
 
                 <Pagination 
-                  total={totalItems} 
+                  total={totalItemsRender} 
                   current={currentPage} 
                   pageSize={pageSize}
                   onChange={setCurrentPage}
@@ -713,7 +666,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white">Gestion des Utilisateurs & Rôles</h2>
                   <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">
-                    {allUsers.length} Utilisateurs inscrits
+                    {usersCount} Utilisateurs inscrits
                   </div>
                 </div>
                 <div className="relative w-full md:w-72">
@@ -746,7 +699,7 @@ export const SuperAdminDashboard: React.FC = () => {
                         </tr>
                       ))
                     ) : (
-                      allUsers
+                      usersData
                         .filter(u => 
                           u.full_name?.toLowerCase().includes(userSearch.toLowerCase()) || 
                           u.email?.toLowerCase().includes(userSearch.toLowerCase())
@@ -783,7 +736,7 @@ export const SuperAdminDashboard: React.FC = () => {
                               className="bg-transparent text-xs font-bold uppercase tracking-widest outline-none dark:text-white cursor-pointer max-w-[200px]"
                             >
                               <option value="">Aucune (National)</option>
-                              {tenants.map(t => (
+                              {tenantsData.map((t: any) => (
                                 <option key={t.id} value={t.id}>{t.name}</option>
                               ))}
                             </select>

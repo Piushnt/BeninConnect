@@ -1,5 +1,6 @@
 import React, { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TenantProvider, useTenant } from './contexts/TenantContext';
@@ -101,6 +102,16 @@ const PageLoader = () => (
   </div>
 );
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes cache
+    },
+  },
+});
+
 // Protected Route Wrapper
 const ProtectedRoute: React.FC<{ 
   children: React.ReactNode; 
@@ -110,14 +121,23 @@ const ProtectedRoute: React.FC<{
   const { profile, loading: authLoading } = useAuth();
   const { tenant, loading: tenantLoading } = useTenant();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    if (!authLoading && !profile) {
-      navigate('/auth/login');
-    } else if (!authLoading && profile && allowedRoles && !allowedRoles.includes(profile.role)) {
-      navigate('/');
+    if (!authLoading) {
+      if (!profile) {
+        navigate('/auth/login');
+      } else if (allowedRoles && !allowedRoles.includes(profile.role)) {
+        navigate('/');
+      } else if (requireTenant && tenant) {
+        // Isolation logic: Si pas super admin, on force l'accès à son propre tenant uniquement
+        const isSuperAdmin = profile.role === 'super_admin' || profile.role === 'super-admin';
+        if (!isSuperAdmin && profile.tenant_id && profile.tenant_id !== tenant.id) {
+          navigate('/');
+        }
+      }
     }
-  }, [profile, authLoading, allowedRoles, navigate]);
+  }, [profile, authLoading, allowedRoles, navigate, tenant, requireTenant, location.pathname]);
 
   if (authLoading || (requireTenant && tenantLoading)) return <PageLoader />;
   if (!profile) return null;
@@ -129,8 +149,9 @@ const ProtectedRoute: React.FC<{
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
         <TenantProvider>
           <FeatureProvider>
             <Router>
@@ -218,5 +239,6 @@ export default function App() {
         </TenantProvider>
       </AuthProvider>
     </ThemeProvider>
+    </QueryClientProvider>
   );
 }
