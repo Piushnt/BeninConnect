@@ -678,7 +678,4 @@ CREATE INDEX idx_announcements_tenant ON announcements(tenant_id);
 CREATE INDEX idx_announcements_category ON announcements(category);
 CREATE INDEX idx_announcements_published ON announcements(published_at DESC);
 
--- Trigger pour updated_at
-CREATE TRIGGER set_announcements_updated_at
-    BEFORE UPDATE ON announcements
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Trigger pour updated_at est géré dans 02_functions_triggers.sql

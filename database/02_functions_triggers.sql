@@ -45,9 +45,11 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Triggers de mise à jour updated_at
 CREATE TRIGGER update_tenants_updated_at BEFORE UPDATE ON tenants FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_dossiers_updated_at BEFORE UPDATE ON dossiers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_announcements_updated_at BEFORE UPDATE ON announcements FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Historique des dossiers automatique
 CREATE OR REPLACE FUNCTION log_dossier_status_change()
@@ -109,12 +111,6 @@ BEGIN
      RAISE EXCEPTION 'Non autorisé: Seul un Super Admin peut inviter des administrateurs.';
   END IF;
 
-  -- Création impossible de l'auth.user via RPC sans pgcrypto ou API Supabase admin
-  -- DONC cette fonction sert plutôt si l'utilisateur a DÉJÀ signé avec OTP/Magic Link, ou créer une invitation table ?
-  -- Puisque supabase auth.users n'est pas insérable directement via RPC facilement, 
-  -- L'approche standard est de stocker l'invitation et le client Supabase Auth Admin le crée, 
-  -- OU on fait juste une mise à jour d'un compte citoyen existant.
-  
   -- Si l'email est déjà dans auth.users: on modifie le rôle.
   SELECT id INTO new_user_id FROM auth.users WHERE email = admin_email;
   
@@ -123,7 +119,6 @@ BEGIN
      RETURN new_user_id;
   ELSE
      -- Si l'utilisateur n'existe pas encore, on crée une "invitation pending"
-     -- Dans ce système, l'invitation n'est pas native via RPC. On lance une erreur gérée avec instruction.
      RAISE EXCEPTION 'Utilisateur introuvable. Le futur admin doit d''abord se connecter une fois (Magic Link) pour que son profil soit créé.';
   END IF;
 END;
