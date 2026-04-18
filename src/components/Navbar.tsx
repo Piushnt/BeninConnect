@@ -44,7 +44,7 @@ export const Navbar: React.FC = () => {
       `)
       .eq('tenant_id', tenant?.id)
       .eq('features.key', 'civil_registry')
-      .single();
+      .maybeSingle(); // maybeSingle() au lieu de single() pour éviter le 406 si la feature n'existe pas encore
     
     setIsCivilRegistryEnabled(!!(data as any)?.is_enabled);
   };

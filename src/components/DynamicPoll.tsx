@@ -53,7 +53,7 @@ export const DynamicPoll: React.FC = () => {
         .eq('tenant_id', tenant?.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle(); // maybeSingle() évite le 406 si aucun sondage n'existe encore
 
       if (pollError || !pollData) {
         setLoading(false);

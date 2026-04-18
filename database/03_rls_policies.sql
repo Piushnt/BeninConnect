@@ -2,34 +2,51 @@
 -- 9. SÉCURITÉ (RLS) - VERSION OPTIMISÉE SANS RÉCURSION
 -- ===============================================================
 
--- Désactivation/Réactivation pour nettoyage propre
+-- ===============================================================
+-- Nettoyage complet pour éviter les conflits de politiques
+-- ===============================================================
 DROP POLICY IF EXISTS "Profiles viewable by owner or staff" ON user_profiles;
 DROP POLICY IF EXISTS "Users can insert their own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Chef Arrondissement can manage their arrondissement" ON user_profiles;
 DROP POLICY IF EXISTS "Super admins can manage all profiles" ON user_profiles;
+DROP POLICY IF EXISTS "Profiles are viewable by owner" ON user_profiles;
+DROP POLICY IF EXISTS "Staff can view profiles for their tenant" ON user_profiles;
+DROP POLICY IF EXISTS "Super admins can manage everything" ON user_profiles;
+DROP POLICY IF EXISTS "Self-registration" ON user_profiles;
+DROP POLICY IF EXISTS "Self-update" ON user_profiles;
 
--- 1. USER PROFILES (Cœur du système)
--- On utilise auth.uid() directement sans passer par get_my_role() pour éviter la récursion
-CREATE POLICY "Profiles are viewable by owner" ON user_profiles FOR SELECT USING (auth.uid() = id);
+-- 1. USER PROFILES
+-- IMPORTANT: Toutes ces politiques utilisent get_my_role() et get_my_tenant_id()
+-- qui sont des fonctions SECURITY DEFINER. Elles accèdent à user_profiles en
+-- bypassant le RLS, ce qui évite totalement la récursion infinie (erreur 42P17).
 
--- NOTE: La politique de vue du staff utilise une sous-requête AUTH (SECURITY DEFINER)
--- pour éviter toute récursion avec user_profiles. La fonction get_my_role() est SECURITY DEFINER
--- donc elle accède à la table directement sans passer par RLS (pas de récursion).
-CREATE POLICY "Staff can view profiles for their tenant" ON user_profiles FOR SELECT USING (
-    get_my_role() IN ('super_admin', 'super-admin')
-    OR (
-        get_my_role() IN ('admin', 'agent', 'ca_admin')
-        AND tenant_id = get_my_tenant_id()
-    )
-);
+-- Lecture : chaque utilisateur voit son propre profil
+CREATE POLICY "Profiles are viewable by owner" ON user_profiles
+    FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Super admins can manage everything" ON user_profiles FOR ALL USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('super_admin', 'super-admin'))
-);
+-- Lecture : le staff voit les profils de son tenant (via SECURITY DEFINER, pas de récursion)
+CREATE POLICY "Staff can view profiles for their tenant" ON user_profiles
+    FOR SELECT USING (
+        get_my_role() IN ('super_admin', 'super-admin')
+        OR (
+            get_my_role() IN ('admin', 'agent', 'ca_admin')
+            AND tenant_id = get_my_tenant_id()
+        )
+    );
 
-CREATE POLICY "Self-registration" ON user_profiles FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "Self-update" ON user_profiles FOR UPDATE USING (auth.uid() = id);
+-- Gestion complète par le super admin (via SECURITY DEFINER, pas de récursion)
+CREATE POLICY "Super admins can manage everything" ON user_profiles
+    FOR ALL USING (get_my_role() IN ('super_admin', 'super-admin'))
+    WITH CHECK (get_my_role() IN ('super_admin', 'super-admin'));
+
+-- Auto-inscription : un utilisateur peut créer son propre profil
+CREATE POLICY "Self-registration" ON user_profiles
+    FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Auto-mise à jour : un utilisateur peut mettre à jour son propre profil
+CREATE POLICY "Self-update" ON user_profiles
+    FOR UPDATE USING (auth.uid() = id);
 
 -- 2. TENANTS & SERVICES
 CREATE POLICY "Public read access to tenants" ON tenants FOR SELECT USING (true);
