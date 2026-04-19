@@ -210,68 +210,6 @@ export const SystemSetup: React.FC = () => {
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="max-w-3xl mx-auto px-4 space-y-8 relative z-10">
-        {/* Promotion Section */}
-        <div className="bento-card p-8 md:p-10">
-          <div className="flex items-center gap-6 mb-8">
-            <div className="p-4 bg-purple-50 dark:bg-purple-500/10 rounded-2xl text-purple-600 dark:text-purple-400 shadow-lg shadow-purple-500/5">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-white tracking-tight">Privilèges Administrateur</h2>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-widest mt-1">Élevez votre compte au rang de Super Administrateur</p>
-            </div>
-          </div>
-
-          <div className="p-6 bg-purple-50/50 dark:bg-purple-900/10 rounded-2xl border border-purple-100 dark:border-purple-900/20 mb-8">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="w-5 h-5 text-purple-600 mt-0.5 shrink-0" />
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-purple-900 dark:text-purple-100 uppercase tracking-widest">Mode Développeur Actif</p>
-                <p className="text-sm text-purple-700 dark:text-purple-300 leading-relaxed">
-                  Cette action modifiera votre profil pour vous donner accès à la Console Globale et au Tableau de Bord Ministériel.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={async () => {
-              if (!profile) return;
-              setLoading(true);
-              try {
-                // Use RPC for elevation to bypass RLS restrictions on self-update of role
-                const { error } = await supabase.rpc('bootstrap_super_admin');
-                if (error) throw error;
-                alert('Vous êtes maintenant Super Administrateur ! Rechargez la page.');
-                window.location.reload();
-              } catch (err: any) {
-                alert('Erreur: ' + err.message);
-              } finally {
-                setLoading(false);
-              }
-            }}
-            disabled={loading || profile?.role === 'super_admin'}
-            className={cn(
-              "w-full py-5 rounded-2xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3",
-              profile?.role === 'super_admin' 
-                ? "bg-gray-100 dark:bg-white/5 text-gray-400 cursor-not-allowed"
-                : "bg-purple-600 text-white shadow-xl shadow-purple-600/20 hover:bg-purple-700 hover:scale-[1.02] active:scale-[0.98]"
-            )}
-          >
-            {profile?.role === 'super_admin' ? (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                Déjà Super Administrateur
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="w-4 h-4" />
-                Devenir Super Administrateur
-              </>
-            )}
-          </button>
-        </div>
-
         {profile?.role === 'super_admin' ? (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
