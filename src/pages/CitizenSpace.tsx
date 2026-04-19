@@ -26,10 +26,11 @@ import {
   Camera,
   Trash2,
   Save,
-  Pencil
+  Pencil,
+  Loader2
 } from 'lucide-react';
-import { Dossier, CitizenDocument } from '../types';
-import { cn } from '../lib/utils';
+import { Dossier, CitizenDocument, Tenant } from '../types';
+import { cn, formatDate } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
 export const CitizenSpace: React.FC = () => {
@@ -38,6 +39,8 @@ export const CitizenSpace: React.FC = () => {
   const [documents, setDocuments] = useState<CitizenDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<'dossiers' | 'documents' | 'payments' | 'services' | 'profile'>('dossiers');
   const [search, setSearch] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -52,7 +55,17 @@ export const CitizenSpace: React.FC = () => {
     address: '',
     npi: ''
   });
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [showTenantModal, setShowTenantModal] = useState<{isOpen: boolean, targetPath: string}>({isOpen: false, targetPath: ''});
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchTenants = async () => {
+      const { data } = await supabase.from('tenants').select('*').eq('is_active', true).order('name');
+      if (data) setTenants(data);
+    };
+    fetchTenants();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -82,7 +95,7 @@ export const CitizenSpace: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [dossiersRes, docsRes, paymentsRes] = await Promise.all([
+      const [dossiersRes, docsRes, paymentsRes, notificationsRes] = await Promise.all([
         supabase
           .from('dossiers')
           .select('*, status:dossier_statuses(*), tenant_service:tenant_services(*, service:public_services(*)), tenant:tenants(name)')
@@ -97,6 +110,11 @@ export const CitizenSpace: React.FC = () => {
           .from('payments')
           .select('*, dossier:dossiers!inner(tracking_code, citizen_id, tenant_service:tenant_services(service:public_services(name)))')
           .eq('dossiers.citizen_id', user?.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user?.id)
           .order('created_at', { ascending: false })
       ]);
 
@@ -106,6 +124,7 @@ export const CitizenSpace: React.FC = () => {
       setDossiers(dossiersRes.data || []);
       setDocuments(docsRes.data || []);
       setPayments(paymentsRes.data || []);
+      setNotifications(notificationsRes.data || []);
     } catch (err) {
       console.error('Error fetching citizen data:', err);
     } finally {
@@ -188,7 +207,7 @@ export const CitizenSpace: React.FC = () => {
       const { error: linkError } = await supabase
         .from('citizen_documents')
         .insert({
-          tenant_id: profile?.tenant_id,
+          tenant_id: null, // Rendre le document globalement accessible à toutes les mairies
           citizen_id: user?.id,
           file_id: storageData.id,
           category: uploadCategory
@@ -228,7 +247,60 @@ export const CitizenSpace: React.FC = () => {
             <h1 className="text-3xl md:text-4xl font-display font-bold text-gray-900 dark:text-white tracking-tight">Bienvenue, {profile?.full_name}</h1>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-3 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl text-gray-500 hover:text-emerald-600 transition-colors"
+            >
+              <Bell className="w-5 h-5" />
+              {notifications.filter(n => !n.is_read).length > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+              )}
+            </button>
+
+            <AnimatePresence>
+              {showNotifications && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute top-14 right-0 w-80 bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+                >
+                  <div className="p-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-white/[0.02]">
+                    <h3 className="font-bold text-sm uppercase tracking-widest text-gray-900 dark:text-white">Notifications</h3>
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">{notifications.filter(n => !n.is_read).length} non lues</span>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-gray-500 uppercase font-bold tracking-widest">
+                        Aucune notification
+                      </div>
+                    ) : (
+                      notifications.map(notif => (
+                        <div 
+                          key={notif.id} 
+                          onClick={async () => {
+                            if (!notif.is_read) {
+                              await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id);
+                              fetchData();
+                            }
+                          }}
+                          className={cn(
+                            "p-4 border-b border-gray-50 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors",
+                            !notif.is_read ? "bg-emerald-50/30 dark:bg-emerald-500/5" : ""
+                          )}
+                        >
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-white">{notif.title}</h4>
+                          <p className="text-xs text-gray-500 mt-1">{notif.content}</p>
+                          <span className="text-[9px] text-gray-400 font-bold mt-2 block">{formatDate(notif.created_at)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <Shield className="w-5 h-5" />
@@ -463,7 +535,7 @@ export const CitizenSpace: React.FC = () => {
                     { title: 'Transport Pro', desc: 'Immatriculation Zemidjan et Taxis.', icon: ShieldCheck, path: 'transport', color: 'bg-emerald-50 text-emerald-600' },
                     { title: 'Localité', desc: 'Démarches au niveau de l\'arrondissement.', icon: MapPin, path: 'arrondissement', color: 'bg-purple-50 text-purple-600' }
                   ].map((s, i) => (
-                    <div key={i} className="bento-card p-6 group cursor-pointer hover:border-emerald-500/30 transition-all" onClick={() => navigate(`/cotonou/services/${s.path}`)}>
+                    <div key={i} className="bento-card p-6 group cursor-pointer hover:border-emerald-500/30 transition-all" onClick={() => setShowTenantModal({isOpen: true, targetPath: s.path})}>
                        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110", s.color)}>
                           <s.icon className="w-6 h-6" />
                        </div>
@@ -638,7 +710,7 @@ export const CitizenSpace: React.FC = () => {
                 ].map((s, i) => (
                   <button 
                     key={i}
-                    onClick={() => window.location.href = `/${profile?.tenant_id}/services/${s.path}`}
+                    onClick={() => setShowTenantModal({isOpen: true, targetPath: s.path})}
                     className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 rounded-xl border border-transparent hover:border-gray-100 dark:hover:border-white/10 transition-all group"
                   >
                     <div className="flex items-center gap-3">
@@ -738,6 +810,74 @@ export const CitizenSpace: React.FC = () => {
                     )}
                   </button>
                 </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Tenant Selector Modal */}
+      <AnimatePresence>
+        {showTenantModal.isOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowTenantModal({isOpen: false, targetPath: ''})}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] rounded-[40px] shadow-2xl border border-gray-100 dark:border-white/10 overflow-hidden flex flex-col max-h-[80vh]"
+            >
+              <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-white dark:bg-white/5 z-10 shrink-0">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-display font-bold text-gray-900 dark:text-white">Choisir une Mairie</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Où souhaitez-vous effectuer cette démarche ?</p>
+                </div>
+                <button onClick={() => setShowTenantModal({isOpen: false, targetPath: ''})} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-all">
+                  <XCircle className="w-6 h-6 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto overflow-x-hidden space-y-3">
+                {tenants.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                        setShowTenantModal({isOpen: false, targetPath: ''});
+                        navigate(`/${t.slug}/services/${showTenantModal.targetPath}`);
+                    }}
+                    className="w-full bento-card p-4 hover:border-emerald-500/30 flex items-center justify-between group transition-all text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      {t.logo_url ? (
+                        <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center p-2 shrink-0 border border-gray-100 dark:border-white/5 overflow-hidden">
+                          <img src={t.logo_url} alt={t.name} className="max-w-full max-h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+                          <Building2 className="w-6 h-6" />
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{t.name}</h4>
+                        <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Commune active</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                  </button>
+                ))}
+                
+                {tenants.length === 0 && (
+                  <div className="text-center py-10">
+                    <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-4" />
+                    <p className="text-sm text-gray-500 font-medium">Chargement des communes disponibles...</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

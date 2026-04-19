@@ -44,10 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // If we're here, we have a user object. 
     // However, if email isn't confirmed, fetching the profile might fail due to RLS.
     const { data: { user } } = await supabase.auth.getUser();
-    if (user && !user.email_confirmed_at) {
-      setLoading(false);
-      return;
-    }
+    // Le contrôle d'email non confirmé est délégué à ProtectedRoute pour un meilleur UX.
 
     try {
       const { data, error } = await supabase

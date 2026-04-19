@@ -33,7 +33,7 @@ export interface Tenant {
     accentColor: string;
   };
   is_active: boolean;
-  site_config?: any;
+  site_config?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
@@ -90,7 +90,7 @@ export interface Dossier {
   service_id: string;
   status_id: string;
   tracking_code: string;
-  submission_data: any;
+  submission_data: Record<string, any>;
   created_at: string;
   updated_at: string;
   status?: DossierStatus;

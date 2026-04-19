@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'motion/react';
-import { Search, Globe, ChevronRight, Building2, Shield, Users, FileText, CreditCard, MapPin } from 'lucide-react';
+import { Search, Globe, ChevronRight, Building2, Shield, Users, FileText, CreditCard, MapPin, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export const NationalServices: React.FC = () => {
@@ -9,6 +9,8 @@ export const NationalServices: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tous');
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const [showTenantModal, setShowTenantModal] = useState(false);
 
   const categories = [
     'Tous',
@@ -166,8 +168,11 @@ export const NationalServices: React.FC = () => {
                       <CreditCard className="w-4 h-4" />
                       {service.base_price > 0 ? `${service.base_price} FCFA` : 'Gratuit'}
                     </div>
-                    <button className="flex items-center gap-2 text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-widest group-hover:text-green-500 transition-colors">
-                      Démarrer
+                    <button 
+                      onClick={() => setSelectedService(service)}
+                      className="flex items-center gap-2 text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-widest group-hover:text-green-500 transition-colors"
+                    >
+                      Détails & Démarche
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -178,27 +183,83 @@ export const NationalServices: React.FC = () => {
         </div>
       </section>
 
-      {/* Help Section */}
-      <section className="py-20 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gray-900 rounded-[48px] p-12 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-green-500/20 to-transparent" />
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
-              <div className="max-w-xl">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-6">Besoin d'aide pour vos démarches ?</h2>
-                <p className="text-lg text-gray-400 font-medium">
-                  Nos agents sont disponibles pour vous accompagner dans l'utilisation du portail national. 
-                  Consultez nos guides ou contactez le support technique.
-                </p>
+      {/* Service Details Modal (CDC Compliance) */}
+      {selectedService && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectedService(null)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-[32px] p-8 shadow-2xl z-10 border border-gray-100 dark:border-gray-800"
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <span className="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1 rounded-full uppercase tracking-widest">{selectedService.category}</span>
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white mt-3 leading-tight">{selectedService.name}</h3>
               </div>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button className="px-8 py-4 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 transition-all">Consulter les guides</button>
-                <button className="px-8 py-4 bg-green-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-green-600 transition-all">Contacter le support</button>
+              <button onClick={() => setSelectedService(null)} className="p-2 bg-gray-50 dark:bg-gray-800 rounded-full text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors w-8 h-8 flex items-center justify-center text-sm font-black">✕</button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 flex items-center gap-4">
+                 <div className="w-12 h-12 bg-white dark:bg-gray-900 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Prix</span>
+                 </div>
+                 <div>
+                    <span className="text-xl font-black text-green-600">{selectedService.base_price > 0 ? `${selectedService.base_price} FCFA` : 'Gratuit'}</span>
+                 </div>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Pièces à fournir obligatoires</h4>
+                <ul className="space-y-2">
+                   {(typeof selectedService.required_documents === 'string' ? JSON.parse(selectedService.required_documents) : selectedService.required_documents || []).map((doc: string, idx: number) => (
+                     <li key={idx} className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        {doc}
+                     </li>
+                   ))}
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Statut de Dématérialisation</h4>
+                <div className="flex items-center gap-2">
+                   {selectedService.global_status === 'online' ? (
+                     <span className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-bold uppercase tracking-widest">✅ En Ligne</span>
+                   ) : selectedService.global_status === 'partial' ? (
+                     <span className="px-3 py-1 bg-orange-50 text-orange-600 rounded-lg text-xs font-bold uppercase tracking-widest">🟡 Partiel (Retrait Physique)</span>
+                   ) : (
+                     <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold uppercase tracking-widest">❌ Présentiel</span>
+                   )}
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+                {selectedService.external_link ? (
+                  <button onClick={() => window.open(selectedService.external_link, '_blank')} className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:opacity-90">
+                    Continuer sur le site externe <Globe className="w-4 h-4" />
+                  </button>
+                ) : selectedService.global_status === 'online' || selectedService.global_status === 'partial' ? (
+                  <button onClick={() => {
+                        window.location.href = '/mon-espace';
+                  }} className="w-full py-4 bg-green-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-green-600 flex items-center justify-center gap-2">
+                    Faire la démarche via mon espace <ChevronRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-white rounded-xl font-black uppercase tracking-widest text-[10px]">
+                    Prendre Rendez-vous en Mairie
+                  </button>
+                )}
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
-      </section>
+      )}
+
     </div>
   );
 };

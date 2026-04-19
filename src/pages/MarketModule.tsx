@@ -31,6 +31,7 @@ export const MarketModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStand, setSelectedStand] = useState<any>(null);
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showAddStandModal, setShowAddStandModal] = useState(false);
 
   useEffect(() => {
     if (tenant) {
@@ -106,8 +107,30 @@ export const MarketModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false 
         .eq('id', standId);
       
       fetchData();
+      fetchData();
     } catch (error) {
       alert('Erreur approbation');
+    }
+  };
+
+  const handleCreateStand = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    try {
+      const { error } = await supabase.from('market_stands').insert({
+        tenant_id: tenant?.id,
+        stand_number: fd.get('stand_number'),
+        market_name: fd.get('market_name'),
+        category: fd.get('category'),
+        monthly_rent: Number(fd.get('monthly_rent')),
+        status: 'LIBRE'
+      });
+      if (error) throw error;
+      alert('Stand ajouté avec succès');
+      setShowAddStandModal(false);
+      fetchData();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -167,6 +190,14 @@ export const MarketModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false 
             >
               {isAdmin ? "Demandes d'Attribution" : 'Mes Demandes'}
             </button>
+            {isAdmin && activeView === 'stands' && (
+              <button 
+                onClick={() => setShowAddStandModal(true)}
+                className="ml-auto px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Ajouter Stand
+              </button>
+            )}
           </div>
 
           {activeView === 'stands' ? (
@@ -333,6 +364,40 @@ export const MarketModule: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false 
               <button onClick={() => setShowApplyModal(false)} className="flex-1 btn-ghost py-4">Annuler</button>
               <button onClick={() => handleApply(selectedStand.id)} className="flex-1 btn-primary py-4">Confirmer la demande</button>
             </div>
+          </motion.div>
+        </div>
+      )}
+    {/* Add Stand Modal */}
+      {showAddStandModal && isAdmin && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md shadow-2xl p-8 space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold dark:text-white">Créer un Stand</h3>
+              <button onClick={() => setShowAddStandModal(false)}><X className="text-gray-400 w-6 h-6" /></button>
+            </div>
+            <form onSubmit={handleCreateStand} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">N° de Stand</label>
+                <input name="stand_number" required className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl text-sm outline-none mt-1" placeholder="Ex: C-14" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Nom du Marché</label>
+                <input name="market_name" required className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl text-sm outline-none mt-1" placeholder="Ex: Marché Central" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Type (Catégorie)</label>
+                <select name="category" className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl text-sm outline-none mt-1">
+                  <option value="boutique">Boutique</option>
+                  <option value="hangar">Hangar</option>
+                  <option value="place_ouverte">Place Ouverte</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Loyer Mensuel (FCFA)</label>
+                <input name="monthly_rent" type="number" required className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl text-sm outline-none mt-1" placeholder="15000" />
+              </div>
+              <button type="submit" className="w-full btn-primary bg-emerald-500 hover:bg-emerald-600 border-none mt-4 py-3 text-white">Ajouter</button>
+            </form>
           </motion.div>
         </div>
       )}

@@ -14,9 +14,9 @@ DROP TABLE IF EXISTS audit_logs CASCADE;
 DROP TABLE IF EXISTS kpi_metrics CASCADE;
 DROP TABLE IF EXISTS ai_interactions CASCADE;
 DROP TABLE IF EXISTS knowledge_base CASCADE;
-DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS notification_targets CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS citizen_documents CASCADE;
 DROP TABLE IF EXISTS file_versions CASCADE;
 DROP TABLE IF EXISTS file_storage CASCADE;
@@ -181,7 +181,7 @@ CREATE TABLE dossier_statuses (
 
 CREATE TABLE public_services (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     description TEXT,
     category TEXT,
     base_price DECIMAL(12,2) DEFAULT 0,
@@ -234,6 +234,18 @@ CREATE TABLE dossier_history (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    dossier_id UUID NOT NULL REFERENCES dossiers(id) ON DELETE CASCADE,
+    amount DECIMAL(12,2) NOT NULL,
+    currency TEXT DEFAULT 'XOF',
+    gateway_ref TEXT,
+    reference TEXT UNIQUE,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed')),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE file_storage (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -267,33 +279,23 @@ CREATE TABLE citizen_documents (
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    image_url TEXT,
-    action_url TEXT,
+    content TEXT NOT NULL,
+    type TEXT,
     priority TEXT DEFAULT 'normal' CHECK (priority IN ('info', 'alert', 'news', 'event', 'low', 'normal', 'high', 'urgent')),
+    is_read BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- notification_targets (Optionnel: pour le suivi des lectures de broadcasts)
 CREATE TABLE notification_targets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
-    role_target TEXT CHECK (role_target IN ('admin', 'agent', 'citizen')),
     is_read BOOLEAN DEFAULT false,
     read_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    dossier_id UUID NOT NULL REFERENCES dossiers(id) ON DELETE CASCADE,
-    amount DECIMAL(12,2) NOT NULL,
-    currency TEXT DEFAULT 'XOF',
-    gateway_ref TEXT,
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed')),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -672,32 +674,32 @@ CREATE INDEX idx_announcements_published ON announcements(published_at DESC);
 -- ===============================================================
 
 CREATE OR REPLACE FUNCTION get_my_role()
-RETURNS TEXT AS $$
+RETURNS TEXT AS $body$
     SELECT role FROM user_profiles WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+$body$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION get_my_tenant_id()
-RETURNS UUID AS $$
+RETURNS UUID AS $body$
     SELECT tenant_id FROM user_profiles WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+$body$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION is_admin_for_tenant(t_id UUID)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN AS $body$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
         AND (role IN ('super_admin', 'super-admin') OR (role IN ('admin', 'ca_admin') AND tenant_id = t_id))
     );
-$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+$body$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION is_staff_for_tenant(t_id UUID)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN AS $body$
     SELECT EXISTS (
         SELECT 1 FROM user_profiles 
         WHERE id = auth.uid() 
         AND (role IN ('super_admin', 'super-admin') OR (tenant_id = t_id AND role IN ('admin', 'agent', 'ca_admin')))
     );
-$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+$body$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -720,7 +722,7 @@ DROP TRIGGER IF EXISTS update_announcements_updated_at ON announcements;
 CREATE TRIGGER update_announcements_updated_at BEFORE UPDATE ON announcements FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger AS $body$
 BEGIN
   INSERT INTO public.user_profiles (id, full_name, role, tenant_id, is_approved)
   VALUES (
@@ -734,49 +736,51 @@ BEGIN
   INSERT INTO public.citizen_profiles (id, npi)
   VALUES (
     new.id,
-    COALESCE(new.raw_user_meta_data->>'npi', 'PENDING')
+    (new.raw_user_meta_data->>'npi')
   );
 
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$body$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-CREATE OR REPLACE FUNCTION initialize_tenant(t_id UUID)
-RETURNS void AS $$
+CREATE OR REPLACE FUNCTION initialize_tenant(v_t_id UUID)
+RETURNS void AS $body$
 BEGIN
     INSERT INTO tenant_features (tenant_id, feature_id)
-    SELECT t_id, id FROM features ON CONFLICT DO NOTHING;
+    SELECT v_t_id, id FROM features ON CONFLICT DO NOTHING;
 
     INSERT INTO tenant_services (tenant_id, service_id, is_active, is_visible)
-    SELECT t_id, id, true, true FROM public_services ON CONFLICT DO NOTHING;
+    SELECT v_t_id, id, true, true FROM public_services ON CONFLICT DO NOTHING;
 
     INSERT INTO page_sections (tenant_id, page_id, section_id, content) VALUES 
-    (t_id, 'home', 'hero', '{"title": "Bienvenue", "subtitle": "Votre mairie à portée de clic", "badge": "Service Public Digital"}'),
-    (t_id, 'home', 'stats', '[{"label": "Services", "value": "24/7"}, {"label": "Projets", "value": "0"}]'),
-    (t_id, 'home', 'budget', '{"title": "Budget Participatif", "description": "Participez au développement de votre commune.", "amount": "En attente", "button_text": "En savoir plus"}'),
-    (t_id, 'maire', 'biography', '{"name": "Maire de la Commune", "bio": "Biographie en attente de mise à jour.", "photo_url": "https://picsum.photos/seed/maire/400/400"}'),
-    (t_id, 'tourisme', 'hero', '{"title": "Découvrez notre patrimoine", "subtitle": "Une commune riche en culture et en histoire.", "image_url": "https://picsum.photos/seed/tourisme/1920/1080"}'),
-    (t_id, 'actualites', 'hero', '{"title": "Actualités Municipales", "subtitle": "Restez informé des dernières nouvelles de votre commune."}')
+    (v_t_id, 'home', 'hero', '{"title": "Bienvenue", "subtitle": "Votre mairie à portée de clic", "badge": "Service Public Digital"}'),
+    (v_t_id, 'home', 'stats', '[{"label": "Services", "value": "24/7"}, {"label": "Projets", "value": "0"}]'),
+    (v_t_id, 'home', 'budget', '{"title": "Budget Participatif", "description": "Participez au développement de votre commune.", "amount": "En attente", "button_text": "En savoir plus"}'),
+    (v_t_id, 'maire', 'biography', '{"name": "Maire de la Commune", "bio": "Biographie en attente de mise à jour.", "photo_url": "https://picsum.photos/seed/maire/400/400"}'),
+    (v_t_id, 'tourisme', 'hero', '{"title": "Découvrez notre patrimoine", "subtitle": "Une commune riche en culture et en histoire.", "image_url": "https://picsum.photos/seed/tourisme/1920/1080"}'),
+    (v_t_id, 'actualites', 'hero', '{"title": "Actualités Municipales", "subtitle": "Restez informé des dernières nouvelles de votre commune."}')
     ON CONFLICT (tenant_id, page_id, section_id) DO UPDATE SET content = EXCLUDED.content;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$body$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION bootstrap_super_admin()
-RETURNS void AS $$
+RETURNS void AS $body$
 BEGIN
     UPDATE user_profiles 
     SET role = 'super_admin' 
     WHERE id = auth.uid();
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$body$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ===============================================================
 -- 4. POLITIQUES DE SÉCURITÉ (RLS)
 -- ===============================================================
+
 
 ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
@@ -853,6 +857,63 @@ CREATE POLICY "Staff can manage budget projects" ON budget_projects FOR ALL USIN
 CREATE POLICY "Budget votes are viewable by everyone" ON budget_votes FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can vote" ON budget_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Notifications: un utilisateur ne voit que ses propres notifications
+CREATE POLICY "Users read own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Staff can insert notifications" ON notifications FOR INSERT WITH CHECK (
+    is_staff_for_tenant(tenant_id) OR get_my_role() IN ('super_admin', 'super-admin')
+);
+
+-- notification_targets policies
+CREATE POLICY "Users read own targets" ON notification_targets FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Staff manage targets" ON notification_targets FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+-- Payments: le citoyen voit ses paiements via la jointure dossier
+CREATE POLICY "Citizens can view their payments" ON payments FOR SELECT USING (
+    EXISTS (SELECT 1 FROM dossiers WHERE dossiers.id = payments.dossier_id AND dossiers.citizen_id = auth.uid())
+);
+CREATE POLICY "Staff can manage payments" ON payments FOR ALL USING (
+    EXISTS (SELECT 1 FROM dossiers WHERE dossiers.id = payments.dossier_id AND is_staff_for_tenant(dossiers.tenant_id))
+);
+
+-- Marchés: lecture publique des stands, gestion par staff
+CREATE POLICY "Stands are viewable by everyone" ON market_stands FOR SELECT USING (true);
+CREATE POLICY "Staff manage stands" ON market_stands FOR ALL USING (is_staff_for_tenant(tenant_id));
+CREATE POLICY "Citizens read registrations" ON market_registrations FOR SELECT USING (
+    citizen_id = auth.uid() OR is_staff_for_tenant(tenant_id)
+);
+CREATE POLICY "Citizens can apply for stands" ON market_registrations FOR INSERT WITH CHECK (auth.uid() = citizen_id);
+CREATE POLICY "Staff can manage registrations" ON market_registrations FOR UPDATE USING (is_staff_for_tenant(tenant_id));
+
+-- Analytics RPC for Ministerial Dashboard (Performance Fix)
+CREATE OR REPLACE FUNCTION get_national_statistics()
+RETURNS json AS $body$
+DECLARE
+    v_total_tenants INT;
+    v_total_users INT;
+    v_total_dossiers INT;
+    v_total_revenue DECIMAL;
+    v_active_services INT;
+    v_pending_signalements INT;
+BEGIN
+    v_total_tenants := (SELECT count(*) FROM tenants);
+    v_total_users := (SELECT count(*) FROM user_profiles);
+    v_total_dossiers := (SELECT count(*) FROM dossiers);
+    v_total_revenue := (SELECT COALESCE(sum(amount), 0) FROM payments WHERE status = 'success');
+    v_active_services := (SELECT count(*) FROM public_services WHERE is_active = true);
+    v_pending_signalements := (SELECT count(*) FROM signalements WHERE status = 'pending');
+
+    RETURN json_build_object(
+        'totalTenants', v_total_tenants,
+        'totalUsers', v_total_users,
+        'totalDossiers', v_total_dossiers,
+        'totalRevenue', v_total_revenue,
+        'activeServices', v_active_services,
+        'pendingSignalements', v_pending_signalements
+    );
+END;
+$body$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- 5. DONNÉES DE DÉMONSTRATION (SEED)
 -- ===============================================================
 
@@ -881,15 +942,17 @@ INSERT INTO public_services (name, description, category, base_price, required_d
 ('Certificat de Résidence', 'Attestation de domicile.', 'Administratif', 2000, '["Pièce d''identité", "Preuve de domicile"]', '1. Demande\n2. Vérification\n3. Signature', 'online')
 ON CONFLICT (name) DO NOTHING;
 
-DO $$
-DECLARE
-    zou_id UUID;
-    zakpota_id UUID;
-BEGIN
-    SELECT id INTO zou_id FROM departments WHERE name = 'Zou';
-    INSERT INTO tenants (department_id, name, slug, theme_config)
-    VALUES (zou_id, 'Mairie de Za-Kpota', 'zakpota', '{"primaryColor": "#008751", "secondaryColor": "#EBB700", "accentColor": "#E30613"}')
-    ON CONFLICT (slug) DO NOTHING;
-    SELECT id INTO zakpota_id FROM tenants WHERE slug = 'zakpota';
-    PERFORM initialize_tenant(zakpota_id);
-END $$;
+-- Seed : Département du Zou
+INSERT INTO departments (name, code_iso) VALUES ('Zou', 'BJ-ZO') ON CONFLICT (name) DO NOTHING;
+
+-- Seed : Mairie de Za-Kpota
+INSERT INTO tenants (department_id, name, slug, theme_config)
+VALUES 
+((SELECT id FROM departments WHERE name = 'Zou' LIMIT 1), 'Mairie de Za-Kpota', 'zakpota', '{"primaryColor": "#008751", "secondaryColor": "#EBB700", "accentColor": "#E30613"}')
+ON CONFLICT (slug) DO NOTHING;
+
+-- Initialisation des services pour Za-Kpota
+-- Note: On utilise une fonction existante, mais on peut aussi le faire manuellement si besoin.
+-- Pour la démo, on s'assure que initialize_tenant est appelé pour le tenant 'zakpota'.
+SELECT initialize_tenant(id) FROM tenants WHERE slug = 'zakpota';
+

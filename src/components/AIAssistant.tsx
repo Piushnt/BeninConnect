@@ -6,7 +6,7 @@ import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles, Volume2 } from 'l
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 interface Message {
   role: 'user' | 'assistant';

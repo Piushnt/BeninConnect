@@ -43,31 +43,40 @@ import {
 
 export const MinisterialDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [stats, setStats] = useState({
+    totalTenants: 0,
+    totalUsers: 0,
+    totalDossiers: 0,
+    totalRevenue: 0,
+    activeServices: 0,
+    pendingSignalements: 0
+  });
+  const [dossierStats, setDossierStats] = useState<any[]>([]);
+  const [revenueStats, setRevenueStats] = useState<any[]>([]);
+
   const queryClient = useQueryClient();
 
   const { data: qNationalData, isLoading: loadingOverview } = useQuery({
     queryKey: ['national_overview', currentPage, pageSize],
     queryFn: async () => {
-      const [tenantsRes, usersRes, dossiersRes, paymentsRes, servicesRes, signalementsRes, tenantsListRes, dossiersListRes] = await Promise.all([
-        supabase.from('tenants').select('*', { count: 'exact', head: true }),
-        supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('dossiers').select('*', { count: 'exact', head: true }),
-        supabase.from('payments').select('amount').eq('status', 'success'),
-        supabase.from('public_services').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('signalements').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      const [rpcRes, tenantsListRes, dossiersListRes] = await Promise.all([
+        supabase.rpc('get_national_statistics'),
         supabase.from('tenants').select('*, department:departments(name)', { count: 'exact' }).order('name').range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
         supabase.from('dossiers').select('*, tenant:tenants(name), citizen:user_profiles(full_name)').order('created_at', { ascending: false }).limit(5)
       ]);
 
-      const totalRevenue = (paymentsRes.data || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
+      const rpcData = rpcRes.data || {};
+
       return {
         stats: {
-          totalTenants: tenantsRes.count || 0,
-          totalUsers: usersRes.count || 0,
-          totalDossiers: dossiersRes.count || 0,
-          totalRevenue,
-          activeServices: servicesRes.count || 0,
-          pendingSignalements: signalementsRes.count || 0
+          totalTenants: rpcData.totalTenants || 0,
+          totalUsers: rpcData.totalUsers || 0,
+          totalDossiers: rpcData.totalDossiers || 0,
+          totalRevenue: rpcData.totalRevenue || 0,
+          activeServices: rpcData.activeServices || 0,
+          pendingSignalements: rpcData.pendingSignalements || 0
         },
         tenants: tenantsListRes.data || [],
         tenantsCount: tenantsListRes.count || 0,

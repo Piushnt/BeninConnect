@@ -53,6 +53,7 @@ const ArrondissementModule = lazy(() => import('./pages/ArrondissementModule').t
 const VerifyIdentity = lazy(() => import('./pages/VerifyIdentity').then(m => ({ default: m.VerifyIdentity })));
 const MinisterialDashboard = lazy(() => import('./pages/MinisterialDashboard').then(m => ({ default: m.MinisterialDashboard })));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail').then(m => ({ default: m.VerifyEmail })));
+const PendingApproval = lazy(() => import('./pages/PendingApproval').then(m => ({ default: m.PendingApproval })));
 
 const NotFound = () => (
   <Layout>
@@ -120,28 +121,41 @@ const ProtectedRoute: React.FC<{
   allowedRoles?: string[];
   requireTenant?: boolean;
 }> = ({ children, allowedRoles, requireTenant }) => {
-  const { profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { tenant, loading: tenantLoading } = useTenant();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     if (!authLoading) {
-      if (!profile) {
+      if (!user) {
+        navigate('/auth/login');
+      } else if (user && !user.email_confirmed_at) {
+        navigate('/auth/verify-email');
+      } else if (!profile) {
         navigate('/auth/login');
       } else if (allowedRoles && !allowedRoles.includes(profile.role)) {
         navigate('/');
-      } else if (requireTenant && tenant) {
-        // Isolation logic: Si pas super admin, on force l'accès à son propre tenant uniquement
+      } else {
         const isSuperAdmin = profile.role === 'super_admin' || profile.role === 'super-admin';
-        if (!isSuperAdmin && profile.tenant_id && profile.tenant_id !== tenant.id) {
-          navigate('/');
+        const needsApprovalRoles = ['admin', 'ca_admin', 'agent'];
+        if (needsApprovalRoles.includes(profile.role) && !profile.is_approved && location.pathname.includes('admin-portal')) {
+          navigate('/pending-approval');
+          return;
+        }
+
+        if (requireTenant && tenant) {
+          // Isolation logic: Si pas super admin, on force l'accès à son propre tenant uniquement
+          if (!isSuperAdmin && profile.tenant_id && profile.tenant_id !== tenant.id) {
+            navigate('/');
+          }
         }
       }
     }
-  }, [profile, authLoading, allowedRoles, navigate, tenant, requireTenant, location.pathname]);
+  }, [user, profile, authLoading, allowedRoles, navigate, tenant, requireTenant, location.pathname]);
 
   if (authLoading || (requireTenant && tenantLoading)) return <PageLoader />;
+  if (!user || (user && !user.email_confirmed_at)) return null;
   if (!profile) return null;
   if (allowedRoles && !allowedRoles.includes(profile.role)) return null;
   if (requireTenant && !tenant) return <NotFound />;
@@ -171,6 +185,7 @@ export default function App() {
                   <Route path="/auth/login" element={<Login />} />
                   <Route path="/auth/register" element={<Register />} />
                   <Route path="/auth/verify-email" element={<VerifyEmail />} />
+                  <Route path="/pending-approval" element={<PendingApproval />} />
 
                   {/* Local Portal Routes */}
                   <Route path="/:slug" element={<TenantWrapper><LocalHome /></TenantWrapper>} />
