@@ -3,7 +3,7 @@ import { APIProvider, Map, Marker, InfoWindow, useMarkerRef } from '@vis.gl/reac
 import { supabase } from '../lib/supabase';
 import { useTenant } from '../contexts/TenantContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Info, X, Filter, Navigation, Search } from 'lucide-react';
+import { MapPin, Info, X, Filter, Navigation, Search, AlertCircle } from 'lucide-react';
 
 interface POI {
   id: string;
@@ -159,7 +159,7 @@ export const InteractiveMap: React.FC<{ initialCategory?: string }> = ({ initial
           className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl flex items-center gap-4"
         >
           <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center text-white shrink-0">
-            <AlertTriangle className="w-5 h-5" />
+            <AlertCircle className="w-5 h-5" />
           </div>
           <div>
             <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">Mode Interactif Activé</p>
@@ -192,7 +192,7 @@ export const InteractiveMap: React.FC<{ initialCategory?: string }> = ({ initial
               <Marker 
                 position={clickedCoords}
                 icon={isAddMode ? "https://maps.google.com/mapfiles/ms/icons/red-pushpin.png" : undefined}
-                animation={2} 
+                animation={2 as google.maps.Animation} 
               />
             )}
 

@@ -71,12 +71,17 @@ const getSubdomain = (): string | null => {
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
     return null;
   }
+
+  // Support du domaine de base configurable (Vercel OU production nationale)
+  const baseDomain = import.meta.env.VITE_BASE_DOMAIN || 'emairie.bj';
   
-  const nationalDomains = ['beninconnect.vercel.app', 'emairie.bj', 'www.emairie.bj'];
+  // Domaines nationaux explicites → portail national
+  const nationalDomains = [baseDomain, `www.${baseDomain}`, 'emairie.bj', 'www.emairie.bj'];
   if (nationalDomains.includes(hostname)) {
-    return null; // Portail national
+    return null;
   }
 
+  // Sous-domaine Vercel : [slug].[projet].vercel.app ou [slug].[baseDomain]
   if (hostname.endsWith('.vercel.app')) {
     const sub = hostname.replace('.vercel.app', '');
     if (sub.endsWith('.beninconnect')) {
@@ -167,7 +172,7 @@ const ProtectedRoute: React.FC<{
       } else if (allowedRoles && !allowedRoles.includes(profile.role)) {
         navigate('/');
       } else {
-        const isSuperAdmin = profile.role === 'super_admin' || profile.role === 'super-admin';
+        const isSuperAdmin = profile.role === 'super_admin' || (profile.role as string) === 'super-admin';
         const needsApprovalRoles = ['admin', 'ca_admin', 'agent'];
         if (needsApprovalRoles.includes(profile.role) && !profile.is_approved && location.pathname.includes('admin-portal')) {
           navigate('/pending-approval');

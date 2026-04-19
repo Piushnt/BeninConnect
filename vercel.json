@@ -2,6 +2,18 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/health",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/api/payment/init",
+      "destination": "/api/payment/init"
+    },
+    {
+      "source": "/api/payment/webhook",
+      "destination": "/api/payment/webhook"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
@@ -21,8 +33,32 @@
         {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
         }
       ]
     }
-  ]
+  ],
+  "env": {
+    "VITE_BASE_DOMAIN": "beninconnect.vercel.app"
+  }
 }

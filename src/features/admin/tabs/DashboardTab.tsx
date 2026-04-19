@@ -5,7 +5,6 @@ import { useTenant } from '../../../contexts/TenantContext';
 import { FileText, AlertCircle, Users, Vote, Bell, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../../lib/utils';
-import { Modal } from '../Modal'; // a generic modal if we want, or keep local
 
 export const DashboardTab: React.FC = () => {
   const { tenant } = useTenant();
