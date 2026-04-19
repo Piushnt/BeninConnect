@@ -100,9 +100,8 @@ export const SuperAdminDashboard: React.FC = () => {
   const { data: qLogs, isLoading: qLoadingLogs } = useQuery({
     queryKey: ['audit_logs', currentPage, pageSize],
     queryFn: async () => {
-      // Pour éviter les erreurs si la table n'existe pas on gère silencieusement l'erreur
-      const db = await supabase.from('audit_logs').select('*, user:user_id(full_name, email)', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * pageSize, currentPage * pageSize - 1).catch(() => ({ data: [], count: 0 }));
-      return db;
+      const db = await supabase.from('audit_logs').select('*, user:user_id(full_name, email)', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+      return db.error ? { data: [], count: 0 } : db;
     },
     enabled: activeTab === 'logs'
   });
@@ -110,15 +109,6 @@ export const SuperAdminDashboard: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab]);
-
-  useEffect(() => {
-    fetchData();
-    fetchDepartments();
-    if (activeTab === 'locations') fetchLocations();
-    if (activeTab === 'users') fetchAllUsers();
-    if (activeTab === 'logs') fetchAuditLogs();
-    if (activeTab === 'config') fetchGlobalServices();
-  }, [activeTab, currentPage, pageSize]);
 
   // Données dérivées des Queries
   const { data: tenantsData = [], count: tenantsCount = 0 } = qTenants || { data: [], count: 0 };
@@ -783,7 +773,7 @@ export const SuperAdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                      {auditLogs.map((log) => (
+                      {(logsData || []).map((log: any) => (
                         <tr key={log.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5">
                           <td className="px-6 py-4 text-xs font-medium text-gray-600 dark:text-gray-400">
                              {new Date(log.created_at).toLocaleString('fr-FR')}
@@ -887,7 +877,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 else {
                   alert('Mairie mise à jour !');
                   setEditingTenant(null);
-                  fetchData();
+                  rTenants();
                 }
               }}
               className="p-6 space-y-5"
@@ -993,7 +983,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   
                   alert('Mairie déployée et initialisée avec succès !');
                   setIsAddingTenant(false);
-                  fetchData();
+                  rTenants();
                 } catch (error: any) {
                   alert(`Erreur lors du déploiement: ${error.message}`);
                 }
