@@ -67,13 +67,29 @@ const NotFound = () => (
 // Utilitaires de Sous-Domaine
 const getSubdomain = (): string | null => {
   const hostname = window.location.hostname;
+  
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
     return null;
   }
+  
+  const nationalDomains = ['beninconnect.vercel.app', 'emairie.bj', 'www.emairie.bj'];
+  if (nationalDomains.includes(hostname)) {
+    return null; // Portail national
+  }
+
+  if (hostname.endsWith('.vercel.app')) {
+    const sub = hostname.replace('.vercel.app', '');
+    if (sub.endsWith('.beninconnect')) {
+       return sub.replace('.beninconnect', '');
+    }
+    return sub !== 'beninconnect' ? sub : null;
+  }
+
   const parts = hostname.split('.');
   if (parts.length >= 3 && parts[0] !== 'www') {
     return parts[0];
   }
+  
   return null;
 };
 
@@ -261,7 +277,9 @@ export default function App() {
                     
                     <Route path="system-setup" element={
                       <TenantWrapper fixedSlug={currentSubdomain}>
-                        <SystemSetup />
+                        <ProtectedRoute allowedRoles={['super_admin']} requireTenant={true}>
+                          <SystemSetup />
+                        </ProtectedRoute>
                       </TenantWrapper>
                     } />
                   </Route>
