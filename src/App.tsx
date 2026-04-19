@@ -64,16 +64,30 @@ const NotFound = () => (
   </Layout>
 );
 
+// Utilitaires de Sous-Domaine
+const getSubdomain = (): string | null => {
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
+    return null;
+  }
+  const parts = hostname.split('.');
+  if (parts.length >= 3 && parts[0] !== 'www') {
+    return parts[0];
+  }
+  return null;
+};
+
 // Wrapper to handle tenant loading by slug
-const TenantWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { slug } = useParams<{ slug: string }>();
-  const { setTenantBySlug, loading, error } = useTenant();
+const TenantWrapper: React.FC<{ children: React.ReactNode, fixedSlug?: string | null }> = ({ children, fixedSlug }) => {
+  const { slug: urlSlug } = useParams<{ slug: string }>();
+  const slug = fixedSlug || urlSlug;
+  const { setTenantBySlug, loading, error, tenant } = useTenant();
 
   useEffect(() => {
-    if (slug) {
+    if (slug && (!tenant || tenant.slug !== slug)) {
       setTenantBySlug(slug);
     }
-  }, [slug]);
+  }, [slug, tenant]);
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-screen bg-white dark:bg-gray-900 space-y-4 transition-colors">
@@ -164,6 +178,9 @@ const ProtectedRoute: React.FC<{
 };
 
 export default function App() {
+  const currentSubdomain = getSubdomain();
+  const tenantBasePath = currentSubdomain ? '/' : '/:slug';
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -174,12 +191,16 @@ export default function App() {
               <ScrollToTop />
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  {/* National Portal */}
-                  <Route path="/" element={<Layout><NationalHome /></Layout>} />
-                  <Route path="/services" element={<Layout><NationalServices /></Layout>} />
-                  <Route path="/about" element={<Layout><About /></Layout>} />
-                  <Route path="/actualites" element={<Layout><Actualites /></Layout>} />
-                  <Route path="/mon-espace" element={<Layout><CitizenSpace /></Layout>} />
+                  {/* National Portal - Uniquement monté si pas de sous-domaine ou localhost */}
+                  {(!currentSubdomain) && (
+                    <>
+                      <Route path="/" element={<Layout><NationalHome /></Layout>} />
+                      <Route path="/services" element={<Layout><NationalServices /></Layout>} />
+                      <Route path="/about" element={<Layout><About /></Layout>} />
+                      <Route path="/actualites" element={<Layout><Actualites /></Layout>} />
+                      <Route path="/mon-espace" element={<Layout><CitizenSpace /></Layout>} />
+                    </>
+                  )}
                   
                   {/* Auth */}
                   <Route path="/auth/login" element={<Login />} />
@@ -187,61 +208,63 @@ export default function App() {
                   <Route path="/auth/verify-email" element={<VerifyEmail />} />
                   <Route path="/pending-approval" element={<PendingApproval />} />
 
-                  {/* Local Portal Routes */}
-                  <Route path="/:slug" element={<TenantWrapper><LocalHome /></TenantWrapper>} />
-                  <Route path="/:slug/maire" element={<TenantWrapper><Maire /></TenantWrapper>} />
-                  <Route path="/:slug/conseil" element={<TenantWrapper><Conseil /></TenantWrapper>} />
-                  <Route path="/:slug/arrondissements" element={<TenantWrapper><Arrondissements /></TenantWrapper>} />
-                  <Route path="/:slug/services" element={<TenantWrapper><Services /></TenantWrapper>} />
-                  <Route path="/:slug/suivi-dossier" element={<TenantWrapper><SuiviDossier /></TenantWrapper>} />
-                  <Route path="/:slug/simulateur" element={<TenantWrapper><Simulateur /></TenantWrapper>} />
-                  <Route path="/:slug/actualites" element={<TenantWrapper><Actualites /></TenantWrapper>} />
-                  <Route path="/:slug/annonces" element={<TenantWrapper><Annonces /></TenantWrapper>} />
-                  <Route path="/:slug/sondages" element={<TenantWrapper><Sondages /></TenantWrapper>} />
-                  <Route path="/:slug/signalement" element={<TenantWrapper><Signalement /></TenantWrapper>} />
-                  <Route path="/:slug/stade" element={<TenantWrapper><Stade /></TenantWrapper>} />
-                  <Route path="/:slug/artisans" element={<TenantWrapper><Artisans /></TenantWrapper>} />
-                  <Route path="/:slug/rendezvous" element={<TenantWrapper><RendezVous /></TenantWrapper>} />
-                  <Route path="/:slug/carte" element={<TenantWrapper><Carte /></TenantWrapper>} />
-                  <Route path="/:slug/publications" element={<TenantWrapper><Publications /></TenantWrapper>} />
-                  <Route path="/:slug/histoire" element={<TenantWrapper><Histoire /></TenantWrapper>} />
-                  <Route path="/:slug/tourisme" element={<TenantWrapper><Tourisme /></TenantWrapper>} />
-                  <Route path="/:slug/formulaires" element={<TenantWrapper><Formulaires /></TenantWrapper>} />
-                  <Route path="/:slug/economie" element={<TenantWrapper><Economie /></TenantWrapper>} />
-                  <Route path="/:slug/opportunites" element={<TenantWrapper><Opportunities /></TenantWrapper>} />
-                  <Route path="/:slug/agenda" element={<TenantWrapper><Agenda /></TenantWrapper>} />
-                  <Route path="/:slug/budget-participatif" element={<TenantWrapper><BudgetParticipatif /></TenantWrapper>} />
-                  <Route path="/:slug/open-data" element={<TenantWrapper><OpenData /></TenantWrapper>} />
-                  <Route path="/:slug/contact" element={<TenantWrapper><Contact /></TenantWrapper>} />
+                  {/* Local Portal Routes - Dynamic Base Path */}
+                  <Route path={tenantBasePath}>
+                    <Route index element={<TenantWrapper fixedSlug={currentSubdomain}><LocalHome /></TenantWrapper>} />
+                    <Route path="maire" element={<TenantWrapper fixedSlug={currentSubdomain}><Maire /></TenantWrapper>} />
+                    <Route path="conseil" element={<TenantWrapper fixedSlug={currentSubdomain}><Conseil /></TenantWrapper>} />
+                    <Route path="arrondissements" element={<TenantWrapper fixedSlug={currentSubdomain}><Arrondissements /></TenantWrapper>} />
+                    <Route path="services" element={<TenantWrapper fixedSlug={currentSubdomain}><Services /></TenantWrapper>} />
+                    <Route path="suivi-dossier" element={<TenantWrapper fixedSlug={currentSubdomain}><SuiviDossier /></TenantWrapper>} />
+                    <Route path="simulateur" element={<TenantWrapper fixedSlug={currentSubdomain}><Simulateur /></TenantWrapper>} />
+                    <Route path="actualites" element={<TenantWrapper fixedSlug={currentSubdomain}><Actualites /></TenantWrapper>} />
+                    <Route path="annonces" element={<TenantWrapper fixedSlug={currentSubdomain}><Annonces /></TenantWrapper>} />
+                    <Route path="sondages" element={<TenantWrapper fixedSlug={currentSubdomain}><Sondages /></TenantWrapper>} />
+                    <Route path="signalement" element={<TenantWrapper fixedSlug={currentSubdomain}><Signalement /></TenantWrapper>} />
+                    <Route path="stade" element={<TenantWrapper fixedSlug={currentSubdomain}><Stade /></TenantWrapper>} />
+                    <Route path="artisans" element={<TenantWrapper fixedSlug={currentSubdomain}><Artisans /></TenantWrapper>} />
+                    <Route path="rendezvous" element={<TenantWrapper fixedSlug={currentSubdomain}><RendezVous /></TenantWrapper>} />
+                    <Route path="carte" element={<TenantWrapper fixedSlug={currentSubdomain}><Carte /></TenantWrapper>} />
+                    <Route path="publications" element={<TenantWrapper fixedSlug={currentSubdomain}><Publications /></TenantWrapper>} />
+                    <Route path="histoire" element={<TenantWrapper fixedSlug={currentSubdomain}><Histoire /></TenantWrapper>} />
+                    <Route path="tourisme" element={<TenantWrapper fixedSlug={currentSubdomain}><Tourisme /></TenantWrapper>} />
+                    <Route path="formulaires" element={<TenantWrapper fixedSlug={currentSubdomain}><Formulaires /></TenantWrapper>} />
+                    <Route path="economie" element={<TenantWrapper fixedSlug={currentSubdomain}><Economie /></TenantWrapper>} />
+                    <Route path="opportunites" element={<TenantWrapper fixedSlug={currentSubdomain}><Opportunities /></TenantWrapper>} />
+                    <Route path="agenda" element={<TenantWrapper fixedSlug={currentSubdomain}><Agenda /></TenantWrapper>} />
+                    <Route path="budget-participatif" element={<TenantWrapper fixedSlug={currentSubdomain}><BudgetParticipatif /></TenantWrapper>} />
+                    <Route path="open-data" element={<TenantWrapper fixedSlug={currentSubdomain}><OpenData /></TenantWrapper>} />
+                    <Route path="contact" element={<TenantWrapper fixedSlug={currentSubdomain}><Contact /></TenantWrapper>} />
 
-                  {/* Metropolitan Modules - Citizen Side */}
-                  <Route path="/:slug/services/mon-marche" element={<TenantWrapper><MarketModule isAdmin={false} /></TenantWrapper>} />
-                  <Route path="/:slug/services/foncier" element={<TenantWrapper><LandModule isAdmin={false} /></TenantWrapper>} />
-                  <Route path="/:slug/services/transport" element={<TenantWrapper><TransportModule isAdmin={false} /></TenantWrapper>} />
-                  <Route path="/:slug/services/arrondissement" element={<TenantWrapper><ArrondissementModule /></TenantWrapper>} />
-                  
-                  {/* Admin Routes - Protected */}
-                  <Route path="/:slug/admin-portal" element={
-                    <TenantWrapper>
-                      <ProtectedRoute allowedRoles={['admin', 'agent', 'super_admin', 'ca_admin']} requireTenant={true}>
-                        <AdminPortal />
-                      </ProtectedRoute>
-                    </TenantWrapper>
-                  } />
-                  
-                  <Route path="/:slug/super-admin" element={
-                    <TenantWrapper>
-                      <ProtectedRoute allowedRoles={['super_admin']} requireTenant={true}>
-                        <SuperAdminDashboard />
-                      </ProtectedRoute>
-                    </TenantWrapper>
-                  } />
-                  
-                  <Route path="/:slug/system-setup" element={
-                    <TenantWrapper>
-                      <SystemSetup />
-                    </TenantWrapper>
-                  } />
+                    {/* Metropolitan Modules - Citizen Side */}
+                    <Route path="services/mon-marche" element={<TenantWrapper fixedSlug={currentSubdomain}><MarketModule isAdmin={false} /></TenantWrapper>} />
+                    <Route path="services/foncier" element={<TenantWrapper fixedSlug={currentSubdomain}><LandModule isAdmin={false} /></TenantWrapper>} />
+                    <Route path="services/transport" element={<TenantWrapper fixedSlug={currentSubdomain}><TransportModule isAdmin={false} /></TenantWrapper>} />
+                    <Route path="services/arrondissement" element={<TenantWrapper fixedSlug={currentSubdomain}><ArrondissementModule /></TenantWrapper>} />
+
+                    {/* Admin Routes - Protected */}
+                    <Route path="admin-portal" element={
+                      <TenantWrapper fixedSlug={currentSubdomain}>
+                        <ProtectedRoute allowedRoles={['admin', 'agent', 'super_admin', 'ca_admin']} requireTenant={true}>
+                          <AdminPortal />
+                        </ProtectedRoute>
+                      </TenantWrapper>
+                    } />
+                    
+                    <Route path="super-admin" element={
+                      <TenantWrapper fixedSlug={currentSubdomain}>
+                        <ProtectedRoute allowedRoles={['super_admin']} requireTenant={true}>
+                          <SuperAdminDashboard />
+                        </ProtectedRoute>
+                      </TenantWrapper>
+                    } />
+                    
+                    <Route path="system-setup" element={
+                      <TenantWrapper fixedSlug={currentSubdomain}>
+                        <SystemSetup />
+                      </TenantWrapper>
+                    } />
+                  </Route>
                   
                   <Route path="/ministere" element={
                     <ProtectedRoute allowedRoles={['super_admin']}>
