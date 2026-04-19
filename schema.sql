@@ -850,6 +850,9 @@ CREATE POLICY "Staff manage announcements" ON announcements FOR ALL USING (is_st
 CREATE POLICY "Flash news are public" ON flash_news FOR SELECT USING (true);
 CREATE POLICY "Staff manage flash news" ON flash_news FOR ALL USING (is_staff_for_tenant(tenant_id));
 
+CREATE POLICY "Partners are public" ON partners FOR SELECT USING (true);
+CREATE POLICY "Staff manage partners" ON partners FOR ALL USING (is_staff_for_tenant(tenant_id));
+
 CREATE POLICY "Locations are public" ON locations FOR SELECT USING (true);
 CREATE POLICY "Staff manage locations" ON locations FOR ALL USING (is_staff_for_tenant(tenant_id));
 
