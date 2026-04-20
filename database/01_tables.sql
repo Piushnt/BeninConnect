@@ -392,7 +392,7 @@ CREATE TABLE signalements (
 
 CREATE TABLE news (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
     image_url TEXT,
@@ -431,7 +431,7 @@ CREATE TABLE news_bookmarks (
 
 CREATE TABLE flash_news (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     is_active BOOLEAN DEFAULT true,
     starts_at TIMESTAMPTZ DEFAULT now(),
@@ -564,7 +564,7 @@ CREATE TABLE opportunites (
 
 CREATE TABLE agenda_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
     event_date TIMESTAMPTZ NOT NULL,
@@ -588,7 +588,7 @@ CREATE TABLE reservations_stade (
 
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     category TEXT NOT NULL,
     file_url TEXT NOT NULL,
@@ -598,7 +598,7 @@ CREATE TABLE reports (
 
 CREATE TABLE partners (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     logo_url TEXT NOT NULL,
     link TEXT,
