@@ -15,6 +15,14 @@ DROP POLICY IF EXISTS "Staff can view profiles for their tenant" ON user_profile
 DROP POLICY IF EXISTS "Super admins can manage everything" ON user_profiles;
 DROP POLICY IF EXISTS "Self-registration" ON user_profiles;
 DROP POLICY IF EXISTS "Self-update" ON user_profiles;
+DROP POLICY IF EXISTS "Partners are public" ON partners;
+DROP POLICY IF EXISTS "Arrondissements are public" ON arrondissements;
+DROP POLICY IF EXISTS "Announcements are public" ON announcements;
+DROP POLICY IF EXISTS "Flash news are public" ON flash_news;
+DROP POLICY IF EXISTS "Agenda events are public" ON agenda_events;
+DROP POLICY IF EXISTS "Reports are public" ON reports;
+DROP POLICY IF EXISTS "Council roles are public" ON council_roles;
+DROP POLICY IF EXISTS "Council members are public" ON council_members;
 
 -- 1. USER PROFILES
 -- IMPORTANT: Toutes ces politiques utilisent get_my_role() et get_my_tenant_id()
