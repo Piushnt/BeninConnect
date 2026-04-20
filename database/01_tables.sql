@@ -186,7 +186,7 @@ CREATE TABLE dossier_statuses (
 
 CREATE TABLE public_services (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     description TEXT,
     category TEXT,
     base_price DECIMAL(12,2) DEFAULT 0,

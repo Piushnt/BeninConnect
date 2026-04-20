@@ -102,18 +102,23 @@ CREATE POLICY "Users can manage their own reservations" ON reservations_stade FO
 CREATE POLICY "Staff can manage reservations" ON reservations_stade FOR ALL USING (is_staff_for_tenant(tenant_id));
 
 -- 7. INFRASTRUCTURE & ADMIN
-CREATE POLICY "Staff can manage notifications" ON notifications FOR ALL USING (is_staff_for_tenant(tenant_id));
 CREATE POLICY "Staff can manage partners" ON partners FOR ALL USING (is_staff_for_tenant(tenant_id));
+CREATE POLICY "Partners are public" ON partners FOR SELECT USING (true);
+
 CREATE POLICY "Staff can manage arrondissement content" ON arrondissements FOR ALL USING (is_staff_for_tenant(tenant_id));
+CREATE POLICY "Arrondissements are public" ON arrondissements FOR SELECT USING (true);
 
 -- 8. SIGNALEMENTS (Droit d'alerte)
 CREATE POLICY "Public can signal" ON signalements FOR INSERT WITH CHECK (true);
 CREATE POLICY "Signalements viewable by owner/staff" ON signalements FOR SELECT USING (citizen_id = auth.uid() OR is_staff_for_tenant(tenant_id));
 CREATE POLICY "Staff manage signalements" ON signalements FOR UPDATE USING (is_staff_for_tenant(tenant_id));
 
--- 9. ANNONCES
+-- 9. ANNONCES ET FLASH NEWS
 CREATE POLICY "Announcements are public" ON announcements FOR SELECT USING (true);
 CREATE POLICY "Staff manage announcements" ON announcements FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+CREATE POLICY "Flash news are public" ON flash_news FOR SELECT USING (true);
+CREATE POLICY "Staff manage flash news" ON flash_news FOR ALL USING (is_staff_for_tenant(tenant_id));
 
 -- 10. PARAMÈTRES & PRÉFÉRENCES
 CREATE POLICY "Self-subscription management" ON user_subscriptions FOR ALL USING (auth.uid() = user_id);
@@ -122,6 +127,19 @@ CREATE POLICY "Staff view subscriptions" ON user_subscriptions FOR SELECT USING 
 -- 11. LOCATIONS (Points d'intérêt)
 CREATE POLICY "Locations are public" ON locations FOR SELECT USING (true);
 CREATE POLICY "Staff manage locations" ON locations FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+-- 12. CONTENU ÉTENDU (AGENDA, RAPPORTS, CONSEIL)
+CREATE POLICY "Agenda events are public" ON agenda_events FOR SELECT USING (true);
+CREATE POLICY "Staff manage agenda events" ON agenda_events FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+CREATE POLICY "Reports are public" ON reports FOR SELECT USING (true);
+CREATE POLICY "Staff manage reports" ON reports FOR ALL USING (is_staff_for_tenant(tenant_id));
+
+CREATE POLICY "Council roles are public" ON council_roles FOR SELECT USING (true);
+CREATE POLICY "Staff manage council roles" ON council_roles FOR ALL USING (true); -- Roles can be global or specific
+
+CREATE POLICY "Council members are public" ON council_members FOR SELECT USING (true);
+CREATE POLICY "Staff manage council members" ON council_members FOR ALL USING (is_staff_for_tenant(tenant_id));
 
 -- Application globale de l'ENABLE RLS (juste au cas où)
 DO $$ 

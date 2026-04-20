@@ -11,15 +11,19 @@ export const FlashNewsTicker: React.FC = () => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    if (!tenant) return;
-
     const fetchFlashNews = async () => {
-      const { data } = await supabase
+      let query = supabase
         .from('flash_news')
         .select('*')
-        .eq('tenant_id', tenant.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+        .eq('is_active', true);
+
+      if (tenant) {
+        query = query.eq('tenant_id', tenant.id);
+      } else {
+        query = query.is('tenant_id', null);
+      }
+
+      const { data } = await query.order('created_at', { ascending: false });
       
       if (data) setNews(data);
     };

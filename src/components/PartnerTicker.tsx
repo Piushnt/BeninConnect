@@ -15,18 +15,22 @@ export const PartnerTicker: React.FC = () => {
   const [partners, setPartners] = useState<Partner[]>([]);
 
   useEffect(() => {
-    if (tenant) {
-      fetchPartners();
-    }
+    fetchPartners();
   }, [tenant]);
 
   const fetchPartners = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('partners')
       .select('*')
-      .eq('tenant_id', tenant?.id)
-      .eq('is_active', true)
-      .order('order', { ascending: true });
+      .eq('is_active', true);
+
+    if (tenant) {
+      query = query.eq('tenant_id', tenant.id);
+    } else {
+      query = query.is('tenant_id', null);
+    }
+
+    const { data } = await query.order('order', { ascending: true });
     
     if (data) setPartners(data);
   };
